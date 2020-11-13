@@ -1,0 +1,38 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>lesy</title>
+  <script src="main.js"></script>
+</head>
+<body>
+  <script>
+    var app= Elm.Main.init();
+
+    /**
+    * @see https://stackoverflow.com/questions/118241/calculate-text-width-with-javascript/21015393#21015393
+    */
+    function computeTextWidth(text, font){
+      var canvas=
+        computeTextWidth.canvas
+        || (computeTextWidth.canvas= document.createElement("canvas"));
+      var context= canvas.getContext("2d");
+      context.font= font;
+      var metrics= context.measureText(text);
+      return metrics.width;
+    }
+    
+    app.ports.computeTextWidth.
+      subscribe(
+        function(fontAndText){
+          app.ports.recieveComputedTextWidth.
+            send(
+              computeTextWidth(
+                fontAndText.text, fontAndText.font
+                )
+              );
+          }
+        );
+  </script>
+</body>
+</html>
