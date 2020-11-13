@@ -804,8 +804,9 @@ makeGroup
   )
 
 type alias SizesInGroup a=
-  {a| triangleCircumradius: Float
-    , halfBoxHeight: Float
+  {a
+  | triangleCircumradius: Float
+  , halfBoxHeight: Float
   }
 makeGroupShape:
     Id-> Float ->SizesInGroup a
@@ -1195,6 +1196,8 @@ makeDownloadButton=
       (Html.a
         [ HtmlAttr.href "https://raw.githubusercontent.com/indique/indique.github.io/master/ungi.png"
         , HtmlAttr.download "not-named.lesy"
+        , HtmlAttr.target "_blank"
+        , HtmlAttr.rel "noopener noreferrer"
         ]
         [ Html.text "⤓"
         ]
