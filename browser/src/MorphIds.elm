@@ -2,12 +2,14 @@ module MorphIds exposing
   ( Id, generateId
   , IdDict, empty
   , search, add, update, mapEach, values
+  , encodeId, encodeDict
   )
 
 import Dict
 
 import Random
 import Random.Char
+import Json.Encode
 
 
 {-|**8 of 143,859** valid characters [#0]
@@ -59,19 +61,33 @@ search (Id id) (IdDict dict)=
 
 add: Id ->v ->IdDict v ->IdDict v
 add (Id id)=
-  map <<Dict.insert id
+  Dict.insert id >>map
 
 update:
   Id ->(v ->v) ->IdDict v ->IdDict v
 update (Id id)=
-  map <<Dict.update id <<Maybe.map
+  Maybe.map >>Dict.update id >>map
 
 mapEach:
   (Id ->vA ->vB) ->IdDict vA ->IdDict vB
 mapEach change=
-  map (Dict.map (change <<Id))
+  Dict.map (change <<Id) |>map
 
 values: IdDict v ->List v
 values (IdDict dict)=
   Dict.values dict
+
+
+encodeDict:
+    (v ->Json.Encode.Value)
+  ->IdDict v ->Json.Encode.Value
+encodeDict encodeValue (IdDict dict)=
+  Json.Encode.dict
+    String.fromList
+    encodeValue
+    dict
+
+encodeId: Id ->Json.Encode.Value
+encodeId (Id id)=
+  Json.Encode.string (String.fromList id)
 

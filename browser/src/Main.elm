@@ -31,8 +31,13 @@ import Use.Color exposing (..)
 import Time exposing (..)
 import Use.Animate exposing (pulse)
 
+import File
+import File.Download
+
 
 import MorphIds exposing (..)
+import Json.Encode
+import Json.Encode
 
 
 main: Program () Model Msg
@@ -51,14 +56,44 @@ type alias Morph=
     , input: Group
     , paddedTextWidth: Float
     }
+encodeMorph: Morph ->Json.Encode.Value
+encodeMorph morph=
+  Json.Encode.object
+    [ ( "name"
+      , Json.Encode.string (.name morph)
+      )
+    , ( "paddedTextWidth"
+      , Json.Encode.float (.paddedTextWidth morph)
+      )
+    ]
 
 type Dock=
     Connected Id
-  | NotConnected
+ | NotConnected
 
 type alias Group=
   Translated 
     { input: IdDict Dock }
+encodeGroup: Group ->Json.Encode.Value
+encodeGroup group=
+  Json.Encode.object
+    [ ( "translate"
+      , Use.Translate.encode (.translate group)
+      )
+    , ( "input"
+      , MorphIds.encodeDict
+          (\dock->
+            case dock of
+              Connected id->
+                MorphIds.encodeId id
+
+              NotConnected-> 
+                Json.Encode.string ""
+          )
+          (.input group)
+      )
+    ]
+
 
 move:
   Translate ->Translated a ->Translated a
@@ -67,23 +102,23 @@ move off=
 
 type Selectable=
     NothingSelected
-  | MorphSelected Id
-  | EditorSelected
+ | MorphSelected Id
+ | EditorSelected
 
 type Pressable=
     MorphPressed Id
-  | NoMorphPressed (Id ->Msg)
-  | GroupPressed Id
-  | NotPressed
+ | NoMorphPressed (Id ->Msg)
+ | GroupPressed Id
+ | NotPressed
 
 type Drag=
     Drag
-  | NoDrag
+ | NoDrag
 
 {-would like to eliminate this-}
 type EditorPressed=
     EditorPressed
-  | EditorNotPressed
+ | EditorNotPressed
 
 type alias Sizes=
   SizesInMorphSelected
@@ -165,17 +200,18 @@ init flags=
 
 type Msg=
     FrameTick
-  | Move Translate
-  | Press Pressable
-  | PressEditor
-  | MouseOn Pressable
-  | Lift
-  | Scale Float
-  | ClickTab Id
-  | RenameMorph String
-  | PlaceTrunk Id
-  | AddInput Id Id
-  | RecieveComputedTextWidth Float
+ | Save
+ | Move Translate
+ | Press Pressable
+ | PressEditor
+ | MouseOn Pressable
+ | Lift
+ | Scale Float
+ | ClickTab Id
+ | RenameMorph String
+ | PlaceTrunk Id
+ | AddInput Id Id
+ | RecieveComputedTextWidth Float
 
 
 update: Msg ->Model ->( Model, Cmd Msg )
@@ -183,9 +219,21 @@ update msg ({sizes} as model)=
   case msg of
     FrameTick->
       ( {model
-        | ticks= (+) 1 (.ticks model)
+       | ticks= (+) 1 (.ticks model)
         }
       , Cmd.none
+      )
+    
+    Save->
+      ( model
+      , File.Download.string
+          "not-named.lesy" "text/plain"
+          (.trunkMorph model
+          |>Maybe.andThen
+              (\trunk-> MorphIds.search trunk (.morphs model))
+          |>Maybe.map (encodeMorph >>Json.Encode.encode 4)
+          |>Maybe.withDefault ""
+          )
       )
     
     Move off->
@@ -271,12 +319,12 @@ update msg ({sizes} as model)=
       )
     
     PressEditor->
-      ( {model | editorPressed= EditorPressed }
+      ( {model| editorPressed= EditorPressed }
       , Cmd.none
       )
     
     MouseOn part->
-      ( {model | belowMouse= part }
+      ( {model| belowMouse= part }
       , Cmd.none
       )
     
@@ -299,7 +347,7 @@ update msg ({sizes} as model)=
               scale= (*) ((*) factor lastFactor)
           in
           {model
-          | scale= scale
+         | scale= scale
           , sizes= scaleSizes scale
           }
       , Cmd.none
@@ -314,7 +362,7 @@ update msg ({sizes} as model)=
       ( case .selected model of
           MorphSelected id->
             updateMorph id 
-              (\morph-> { morph | name= to })
+              (\morph-> {morph | name= to })
             <|{model
               | waitingForComputedTextWidth=
                   id::(.waitingForComputedTextWidth model)
@@ -337,9 +385,9 @@ update msg ({sizes} as model)=
                 groupInput= .input morphInput
             in
             {morph
-            | input=
+           | input=
                 {morphInput
-                | input=
+               | input=
                     MorphIds.update
                       toId (\_-> Connected ownId)
                     <|groupInput
@@ -353,7 +401,7 @@ update msg ({sizes} as model)=
       ( List.head (.waitingForComputedTextWidth model)
         |>Maybe.map
           (\id->
-            { model
+            {model
             | waitingForComputedTextWidth=
                 removeHead
                   (.waitingForComputedTextWidth model)
@@ -380,24 +428,24 @@ removeHead=
 
 inDrag: Drag ->Model ->Model
 inDrag drag model=
-  { model | drag= drag }
+  {model | drag= drag }
 
 inPressed: Pressable ->Model ->Model
 inPressed mouseDownOn model=
-  { model | pressed= mouseDownOn }
+  {model | pressed= mouseDownOn }
 
 inTrunk: Maybe Id ->Model ->Model
 inTrunk trunk model=
-  { model | trunkMorph= trunk }
+  {model | trunkMorph= trunk }
 
 updateMorphs:
   (IdDict Morph ->IdDict Morph) ->Model ->Model
 updateMorphs change ({morphs} as model)=
-  { model | morphs= change morphs }
+  {model | morphs= change morphs }
 
 inSelect: Selectable ->Model ->Model
 inSelect selected model=
-  { model | selected= selected }
+  {model | selected= selected }
 
 addMorph:
     Id ->Translate
@@ -677,11 +725,12 @@ makeMorph:
   ->Selectable ->Int
   ->SizesInMorphSelected
     (SizesInMorph
-    {a| textHeight: Float
+      {a
+      | textHeight: Float
       , lineWidth: Float
       , triangleCircumradius: Float
       , defaultMorphTranslate: Translate
-    }
+      }
     )
   ->Svg Msg
 makeMorph
@@ -745,8 +794,9 @@ makeGroup:
   ->SizesInGroup
     (SizesInNoMorph
     (SizesInConnection
-      {a| fontSize: Float
-        , defaultMorphTranslate: Translate
+      {a
+      | fontSize: Float
+      , defaultMorphTranslate: Translate
       }
     ))
   ->Group ->Svg Msg
@@ -1185,22 +1235,21 @@ makeEditorProperties=
     , makeDownloadButton
     ]
 
-makeDownloadButton: Ui.Element msg
+makeDownloadButton: Ui.Element Msg
 makeDownloadButton=
   Ui.el
     [ UiBackground.color editorColor
-    , UiFont.color (Ui.rgb 1 1 1)
+    , Ui.height Ui.fill
     , Ui.padding 10
     ]
-    (Ui.html
-      (Html.a
-        [ HtmlAttr.href "https://raw.githubusercontent.com/indique/indique.github.io/master/ungi.png"
-        , HtmlAttr.download "not-named.lesy"
-        , HtmlAttr.target "_blank"
-        , HtmlAttr.rel "noopener noreferrer"
-        ]
-        [ Html.text "⤓"
-        ]
-      )
+    (UiInput.button
+      []
+      { label=
+          Ui.el
+            [ UiFont.color (Ui.rgb 1 1 1)
+            ]
+            (Ui.text "save")
+      , onPress= Just Save
+      }
     )
 

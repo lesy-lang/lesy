@@ -1,6 +1,8 @@
 module Use.Translate exposing
   (..)
 
+import Json.Encode
+
 
 type alias Translate=
   { x: Float, y: Float }
@@ -38,12 +40,12 @@ map changeX changeY off=
 mapX:
   (Float ->Float) ->Translate ->Translate
 mapX change ({x} as translate)=
-  { translate | x= change x }
+  {translate | x= change x }
 
 mapY:
   (Float ->Float) ->Translate ->Translate
 mapY change ({y} as translate)=
-  { translate | y= change y }
+  {translate | y= change y }
 
 rotation: Translate ->Float
 rotation diff=
@@ -55,12 +57,21 @@ turned by=
 
 
 type alias Translated a=
-  { a | translate: Translate }
+  {a | translate: Translate }
 
 updateTranslate:
     (Translate ->Translate)
   ->Translated a ->Translated a
 updateTranslate change translated=
-  { translated
+  {translated
   | translate= change (.translate translated)
   }
+
+encode:
+  Translate ->Json.Encode.Value
+encode translate=
+  Json.Encode.object
+    [ ( "x", Json.Encode.float (.x translate) )
+    , ( "y", Json.Encode.float (.y translate) )
+    ]
+
