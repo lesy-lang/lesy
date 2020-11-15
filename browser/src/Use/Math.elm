@@ -23,11 +23,12 @@ equilateralTriangleHeight side=
 
 regularPoly: Int ->Float ->Float ->List Translate
 regularPoly edges toMid turn=
-  let angle= (/) (2*pi) (toFloat edges)
+  let anglePerEdge=
+        (/) ((*) 2 pi) (toFloat edges)
   in
   List.range 0 ((-) edges 1)
   |>List.map
-      (toFloat>>((*) angle)
+      (toFloat >>((*) anglePerEdge)
       >>((+) turn)
       >>turned
       >>mapXY ((*) toMid)

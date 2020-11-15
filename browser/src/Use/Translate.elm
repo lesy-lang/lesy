@@ -2,21 +2,17 @@ module Use.Translate exposing
   (..)
 
 import Json.Encode
+import Json.Decode
 
 
 type alias Translate=
   { x: Float, y: Float }
 
-
-{-|create `Translate` from a function-}
-xy: Float ->Float ->Translate
-xy x y= { x= x, y= y }
-
 x0y0: Translate
-x0y0= xy 0 0
+x0y0= Translate 0 0
 
 x1y1: Translate
-x1y1= xy 1 1
+x1y1= Translate 1 1
 
 
 combine:
@@ -74,4 +70,10 @@ encode translate=
     [ ( "x", Json.Encode.float (.x translate) )
     , ( "y", Json.Encode.float (.y translate) )
     ]
+
+decode: Json.Decode.Decoder Translate
+decode=
+  Json.Decode.map2 Translate
+    (Json.Decode.field "x" Json.Decode.float)
+    (Json.Decode.field "y" Json.Decode.float)
 

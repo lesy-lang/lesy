@@ -3,9 +3,11 @@ port module Main exposing (main)
 {-|Editor for lesy
 -}
 
+import Task
+
 import Browser
 import Browser.Events
-import Browser.Navigation as Nav
+import Browser.Navigation
 
 import Url
 
@@ -31,13 +33,17 @@ import Use.Color exposing (..)
 import Time exposing (..)
 import Use.Animate exposing (pulse)
 
-import File
+import File exposing (File)
 import File.Download
+import File.Select
 
+import Json.Encode
+import Json.Decode
+import Use.Encode
 
-import MorphIds exposing (..)
-import Json.Encode
-import Json.Encode
+import Use.List
+import ZipList exposing (ZipList)
+import Ids exposing (..)
 
 
 main: Program () Model Msg
@@ -57,23 +63,39 @@ type alias Morph=
     , paddedTextWidth: Float
     }
 encodeMorph: Morph ->Json.Encode.Value
-encodeMorph morph=
+encodeMorph {translate, name, input, paddedTextWidth}=
   Json.Encode.object
-    [ ( "name"
-      , Json.Encode.string (.name morph)
-      )
+    [ ( "translate", Use.Translate.encode translate )
+    , ( "name", Json.Encode.string name )
+    , ( "input", encodeGroup input )
     , ( "paddedTextWidth"
-      , Json.Encode.float (.paddedTextWidth morph)
+      , Json.Encode.float paddedTextWidth
       )
     ]
-
-type Dock=
-    Connected Id
- | NotConnected
+decodeMorph: Json.Decode.Decoder Morph
+decodeMorph=
+  Json.Decode.map4
+    (\off name input width->
+      { translate= off, name= name, input= input
+      , paddedTextWidth= width
+      }
+    )
+    (Json.Decode.field
+      "translate" Use.Translate.decode
+    )
+    (Json.Decode.field
+      "name" Json.Decode.string
+    )
+    (Json.Decode.field
+      "input" decodeGroup
+    )
+    (Json.Decode.field
+      "paddedTextWidth" Json.Decode.float
+    )
 
 type alias Group=
   Translated 
-    { input: IdDict Dock }
+    { input: IdDict (Maybe Id) }
 encodeGroup: Group ->Json.Encode.Value
 encodeGroup group=
   Json.Encode.object
@@ -81,18 +103,27 @@ encodeGroup group=
       , Use.Translate.encode (.translate group)
       )
     , ( "input"
-      , MorphIds.encodeDict
-          (\dock->
-            case dock of
-              Connected id->
-                MorphIds.encodeId id
-
-              NotConnected-> 
-                Json.Encode.string ""
-          )
+      , Ids.encodeDict
+          (Use.Encode.encodeMaybe Ids.encodeId)
           (.input group)
       )
     ]
+
+
+decodeGroup: Json.Decode.Decoder Group
+decodeGroup=
+  Json.Decode.map2
+    (\off input-> { translate= off, input= input })
+    (Json.Decode.field
+      "translate" Use.Translate.decode
+    )
+    (Json.Decode.field
+      "input"
+      (Ids.decodeDict
+        (Json.Decode.nullable Ids.decodeId
+        )
+      )
+    )
 
 
 move:
@@ -102,23 +133,23 @@ move off=
 
 type Selectable=
     NothingSelected
- | MorphSelected Id
- | EditorSelected
+  | MorphSelected Id
+  | EditorSelected (Maybe Id)
 
 type Pressable=
     MorphPressed Id
- | NoMorphPressed (Id ->Msg)
- | GroupPressed Id
- | NotPressed
+  | NoMorphPressed (Id ->Msg)
+  | GroupPressed Id
+  | NotPressed
 
 type Drag=
     Drag
- | NoDrag
+  | NoDrag
 
 {-would like to eliminate this-}
 type EditorPressed=
     EditorPressed
- | EditorNotPressed
+  | EditorNotPressed
 
 type alias Sizes=
   SizesInMorphSelected
@@ -157,21 +188,25 @@ scaleSizes scale=
       { x= 48, y= 0 }|>mapXY scale
   }
 
+type alias Project=
+  { name: String
+  , selected: Selectable
+  , trunkMorph: Maybe Id
+  , morphs: IdDict Morph
+  }
 
 type alias Model=
   { ticks: Int
   
   , pressed: Pressable
-  , selected: Selectable
   , drag: Drag
   , belowMouse: Pressable
   , editorPressed: EditorPressed
 
   , scale: Float ->Float
   
-  , trunkMorph: Maybe Id
+  , projects: ZipList Project
   , waitingForComputedTextWidth: List Id
-  , morphs: IdDict Morph
   , sizes: Sizes
   }
 
@@ -180,13 +215,13 @@ init flags=
   ( { ticks= 0
 
     , pressed= NotPressed
-    , selected= NothingSelected
+    
     , drag= NoDrag
     , editorPressed= EditorNotPressed
     , belowMouse= NotPressed
 
-    , morphs= MorphIds.empty
-    , trunkMorph= Nothing
+    , projects=
+        ZipList.singleton blankProject
     , waitingForComputedTextWidth= []
 
     , scale= (*) 1
@@ -197,29 +232,92 @@ init flags=
     --dummy morph for testing
   )
 
+blankProject: Project
+blankProject=
+  { name= "not-named"
+  , morphs= Ids.empty
+  , trunkMorph= Nothing
+  , selected= NothingSelected
+  }
+
 
 type Msg=
     FrameTick
- | Save
- | Move Translate
- | Press Pressable
- | PressEditor
- | MouseOn Pressable
- | Lift
- | Scale Float
- | ClickTab Id
- | RenameMorph String
- | PlaceTrunk Id
- | AddInput Id Id
- | RecieveComputedTextWidth Float
+  | Save
+  | Select
+  | RecieveSelectFile File
+  | RecieveSelect String
+  | AddBlankProject
+  | SelectProject Int
+  | Move Translate
+  | Press Pressable
+  | PressEditor
+  | MouseOn Pressable
+  | Lift
+  | Scale Float
+  | SelectMorph Id
+  | RenameMorph String
+  | PlaceTrunk Id
+  | AddInput Id Id
+  | RecieveComputedTextWidth Float
 
+encodeState:
+    Maybe Id-> IdDict Morph
+  ->Json.Encode.Value
+encodeState trunk morphs=
+  Json.Encode.object
+    [ ( "trunk"
+      , trunk
+        |>Maybe.map
+            Ids.encodeId
+        |>Maybe.withDefault
+            (Json.Encode.string "")
+      )
+    , ( "morphs"
+      , Ids.encodeDict
+          encodeMorph morphs
+      )
+    ]
+decodeState: String ->Model ->Model
+decodeState content model=
+  let orFail=
+        Result.withDefault model
+        --failed. maybe a dialog?
+  in
+  Json.Decode.decodeString
+    (Json.Decode.field
+      "morphs" (Ids.decodeDict decodeMorph)
+    )
+    content
+  |>Result.map
+      (\morphs->
+        Json.Decode.decodeString
+          (Json.Decode.field
+            "trunk" (Json.Decode.maybe Ids.decodeId)
+          )
+          content
+        |>Result.map
+            (\trunk->
+              {model
+              | projects=
+                  ZipList.insert
+                    {blankProject
+                    | trunkMorph= trunk
+                    , morphs= morphs
+                    }
+                    (.projects model)
+              }
+            )
+        |>orFail
+      )
+  |>orFail
 
 update: Msg ->Model ->( Model, Cmd Msg )
 update msg ({sizes} as model)=
   case msg of
     FrameTick->
       ( {model
-       | ticks= (+) 1 (.ticks model)
+        | ticks= (+) 1 (.ticks model)
         }
       , Cmd.none
       )
@@ -227,19 +325,63 @@ update msg ({sizes} as model)=
     Save->
       ( model
       , File.Download.string
-          "not-named.lesy" "text/plain"
-          (.trunkMorph model
-          |>Maybe.andThen
-              (\trunk-> MorphIds.search trunk (.morphs model))
-          |>Maybe.map (encodeMorph >>Json.Encode.encode 4)
-          |>Maybe.withDefault ""
+          "not-named.lesy.json" "application/json"
+          (let project= ZipList.current (.projects model)
+          in
+          encodeState
+            (.trunkMorph project) (.morphs project)
+          |>Json.Encode.encode 4
           )
+      )
+    
+    Select->
+      ( model
+      , File.Select.file [ "application/json" ]
+          RecieveSelectFile
+      )
+    
+    RecieveSelectFile file->
+      case
+        String.endsWith ".lesy.json"
+        (File.name file)
+        of
+        True->
+          ( model
+          , Task.perform
+              RecieveSelect (File.toString file)
+          )
+        False->
+          ( model, Cmd.none )
+    
+    RecieveSelect content->
+      ( decodeState content model
+      , Cmd.none
+      )
+    
+    AddBlankProject->
+      ( {model
+        | projects=
+            ZipList.insert blankProject
+              (.projects model)
+        }
+      , generateId PlaceTrunk
+      )
+    
+    SelectProject index->
+      ( {model
+        | projects=
+            ZipList.goToIndex index (.projects model)
+            |>Maybe.withDefault (.projects model)
+        }
+      , Cmd.none
       )
     
     Move off->
       ( let dragMorph id=
               inDrag Drag
-              <|updateMorph id (move off)
+              <|(updateMorph id (move off)
+                |>forSelectedProject
+                )
               <|model
         in
         case .pressed model of
@@ -249,7 +391,7 @@ update msg ({sizes} as model)=
           NotPressed->
             case .editorPressed model of
               EditorPressed->
-                .trunkMorph model
+                .trunkMorph (ZipList.current (.projects model))
                 |>Maybe.map dragMorph
                 |>Maybe.withDefault model
 
@@ -261,12 +403,15 @@ update msg ({sizes} as model)=
           
           GroupPressed output->
             inDrag Drag
-            <|updateMorph output
-                (\morph->
-                  {morph
-                  | input= move off (.input morph)
-                  }
+            <|(forSelectedProject
+                (updateMorph output
+                  (\morph->
+                    {morph
+                    | input= move off (.input morph)
+                    }
+                  )
                 )
+              )
             <|model
 
       , Cmd.none
@@ -286,7 +431,17 @@ update msg ({sizes} as model)=
             NotPressed->
               ( case .editorPressed model of
                   EditorPressed->
-                    upModel|>inSelect EditorSelected
+                    upModel
+                    |>forSelectedProject
+                        (inSelect
+                          (EditorSelected
+                            (case .selected (ZipList.current (.projects model)) of
+                              EditorSelected maybeId-> maybeId
+                              MorphSelected id-> Just id
+                              NothingSelected-> Nothing
+                            )
+                          )
+                        )
 
                   EditorNotPressed->
                     upModel
@@ -294,13 +449,19 @@ update msg ({sizes} as model)=
               )
             
             MorphPressed id->
-              ( upModel|>inSelect (MorphSelected id)
+              ( upModel
+                |>(forSelectedProject
+                    (inSelect (MorphSelected id))
+                  )
               , Cmd.none
               )
             
             NoMorphPressed createMsg->
-              ( upModel|>inSelect NothingSelected
-              , MorphIds.generateId createMsg
+              ( upModel
+                |>(inSelect NothingSelected
+                  |>forSelectedProject
+                  )
+              , Ids.generateId createMsg
               )
             
             GroupPressed output->
@@ -329,40 +490,47 @@ update msg ({sizes} as model)=
       )
     
     Scale factor->
-      ( updateMorphs
-          (mapEach
-              (\_ morph->
-                updateTranslate
-                  (mapXY ((*) factor))
-                  {morph
-                  | paddedTextWidth= 
-                      (*) factor (.paddedTextWidth morph)
-                  , input=
-                      updateTranslate (mapXY ((*) factor))
-                        (.input morph)
-                  }
-              )
+      ( forSelectedProject
+          (updateMorphs
+            (mapEach
+                (\_ morph->
+                  updateTranslate
+                    (mapXY ((*) factor))
+                    {morph
+                    | paddedTextWidth= 
+                        (*) factor (.paddedTextWidth morph)
+                    , input=
+                        updateTranslate (mapXY ((*) factor))
+                          (.input morph)
+                    }
+                )
+            )
           )
         <|let lastFactor= (.scale model) 1
               scale= (*) ((*) factor lastFactor)
           in
           {model
-         | scale= scale
+          | scale= scale
           , sizes= scaleSizes scale
           }
       , Cmd.none
       )
     
-    ClickTab to->
-      ( inSelect (MorphSelected to) model
+    SelectMorph to->
+      ( (inSelect (MorphSelected to)
+         |>forSelectedProject
+        )
+        <|model
       , Cmd.none
       )
     
     RenameMorph to->
-      ( case .selected model of
+      ( case .selected (ZipList.current (.projects model)) of
           MorphSelected id->
-            updateMorph id 
-              (\morph-> {morph | name= to })
+            forSelectedProject
+              (updateMorph id 
+                (\morph-> {morph | name= to })
+              )
             <|{model
               | waitingForComputedTextWidth=
                   id::(.waitingForComputedTextWidth model)
@@ -374,25 +542,27 @@ update msg ({sizes} as model)=
     
     PlaceTrunk id->
       addMorph id (.trunkTranslate sizes)
-      <|inTrunk (Just id)
+      <|(inTrunk (Just id)|>forSelectedProject)
       <|model
     
     AddInput toId ownId->
       model
-      |>updateMorph toId
-          (\morph->
-            let morphInput= .input morph
-                groupInput= .input morphInput
-            in
-            {morph
-           | input=
-                {morphInput
-               | input=
-                    MorphIds.update
-                      toId (\_-> Connected ownId)
-                    <|groupInput
+      |>forSelectedProject
+          (updateMorph toId
+              (\morph->
+                let morphInput= .input morph
+                    groupInput= .input morphInput
+                in
+                {morph
+                | input=
+                    {morphInput
+                    | input=
+                        Ids.update
+                          toId (\_-> Just ownId)
+                        <|groupInput
+                    }
                 }
-            }
+              )
           )
       |>addMorph ownId
           (.defaultMorphTranslate sizes)
@@ -403,28 +573,23 @@ update msg ({sizes} as model)=
           (\id->
             {model
             | waitingForComputedTextWidth=
-                removeHead
+                Use.List.removeHead
                   (.waitingForComputedTextWidth model)
             }
-            |>updateMorph id
-                (\morph->
-                  { morph
-                  | paddedTextWidth=
-                      ((*)
-                        (.fontSize sizes)
-                        width
-                      )
-                      |>padded (.pad sizes)
-                  }
+            |>forSelectedProject
+                (updateMorph id
+                  (\morph->
+                    { morph
+                    | paddedTextWidth=
+                        ((*) width (.fontSize sizes))
+                        |>padded (.pad sizes)
+                    }
+                  )
                 )
           )
           |>Maybe.withDefault model
       , Cmd.none
       )
-
-removeHead: List a ->List a
-removeHead=
-  List.drop 1
 
 inDrag: Drag ->Model ->Model
 inDrag drag model=
@@ -434,18 +599,28 @@ inPressed: Pressable ->Model ->Model
 inPressed mouseDownOn model=
   {model | pressed= mouseDownOn }
 
-inTrunk: Maybe Id ->Model ->Model
-inTrunk trunk model=
-  {model | trunkMorph= trunk }
+forSelectedProject:
+  (Project ->Project) ->Model ->Model
+forSelectedProject change model=
+  {model
+  | projects=
+      Use.List.updateSelected
+      change (.projects model)
+  }
+
+inTrunk: Maybe Id ->Project ->Project
+inTrunk trunk project=
+  {project | trunkMorph= trunk }
 
 updateMorphs:
-  (IdDict Morph ->IdDict Morph) ->Model ->Model
-updateMorphs change ({morphs} as model)=
-  {model | morphs= change morphs }
+    (IdDict Morph ->IdDict Morph)
+  ->Project ->Project
+updateMorphs change project=
+  {project | morphs= change (.morphs project) }
 
-inSelect: Selectable ->Model ->Model
-inSelect selected model=
-  {model | selected= selected }
+inSelect: Selectable ->Project ->Project
+inSelect selected project=
+  {project | selected= selected }
 
 addMorph:
     Id ->Translate
@@ -456,34 +631,37 @@ addMorph
   =
   let name= "🥗 ← 🍅 🥬"
   in
-  ( { model
+  ( {model
     | waitingForComputedTextWidth=
         id::(.waitingForComputedTextWidth model)
     }
-    |>updateMorphs
-        (add id
+    |>forSelectedProject
+        (updateMorphs
+          (add id
             { name= name
             , translate= translate
             , input=
-                { input= MorphIds.empty
+                { input= Ids.empty
                 , translate= (.defaultGroupTranslate sizes)
                 }
             , paddedTextWidth=
+                scale
                 (Use.Svg.aproximateMonospacedWidth
                   (.fontSize sizes) name
                 )
                 |>padded (.pad sizes)
             }
+          )
+        >>inSelect (MorphSelected id)
         )
-      |>inSelect (MorphSelected id)
 
   , computeMorphTextWidth name
   )
 
 updateMorph:
-  Id ->(Morph ->Morph) ->Model ->Model
+  Id ->(Morph ->Morph) ->Project ->Project
 updateMorph id change=
-  updateMorphs (MorphIds.update id change)
+  updateMorphs (Ids.update id change)
   
 
 subscriptions: Model ->Sub Msg
@@ -514,88 +692,68 @@ view model=
           [ HtmlAttr.style "height" "200%" ]
           [ Ui.layoutWith
               { options=
-                  [ Ui.focusStyle focusStyle
+                  [ Ui.focusStyle noChangeOnFocus
                   ]
               }
-              [] (makePage model)
+              [] (viewPage model)
           ]
       ]
   }
-
-focusStyle: Ui.FocusStyle
-focusStyle=
+noChangeOnFocus: Ui.FocusStyle
+noChangeOnFocus=
   { borderColor= Nothing
   , backgroundColor= Nothing
-  , shadow=
-      Just
-        { color= attentionColor|>toRgba Ui.rgba
-        , offset= (0, 0)
-        , blur= 0
-        , size= 3
-        }
+  , shadow= Nothing
   }
   
 
-makePage: Model ->Ui.Element Msg
-makePage model=
+viewPage: Model ->Ui.Element Msg
+viewPage model=
   Ui.column
     [ Ui.height Ui.fill
     , Ui.width Ui.fill
     ]
-    ([ makeTitleScreen
-    , makeProperties model
+    ([ viewTitleScreen
+    , viewEditorScreen model
     ]
     |>List.map
-      (Ui.column
+      (Ui.el
         [ Ui.height (Ui.fillPortion 1)
         , Ui.width Ui.fill
         ]
       )
     )
 
-makeProperties: Model ->List (Ui.Element Msg)
-makeProperties
-  { trunkMorph, morphs, selected
-  , drag, belowMouse
-  , sizes, ticks
-  }
-  =
-  let searchMorph id= search id morphs
-  in
-  [ makeEditor
-      trunkMorph searchMorph
-      selected ticks
-      (case drag of
-        Drag-> Use.Svg.hand
-        NoDrag->
-          case belowMouse of
-            NotPressed-> Use.Svg.arrow
-            _-> Use.Svg.finger
-      )
-      sizes
-  , makeTabs morphs selected
-  , case selected of
-      EditorSelected->
-        makeEditorProperties
-
-      MorphSelected id->
-        (searchMorph id)
-        |>Maybe.map
-            (.name >>makeMorphProperties)
-        |>Maybe.withDefault Ui.none
-        
-      NothingSelected-> Ui.none
-  ]
-
-editorColor: Ui.Color
-editorColor=
-  Ui.rgb 0.039 0.035 0.031
-
-makeTitle: Ui.Element msg
-makeTitle=
+viewTitleScreen: Ui.Element Msg
+viewTitleScreen= 
   Ui.column
     [ Ui.width Ui.fill
-    , Ui.height (Ui.fillPortion 6)
+    , Ui.height Ui.fill
+    ]
+    [ Ui.el
+        [ Ui.width Ui.fill
+        , Ui.height (Ui.fillPortion 6)
+        ]
+        viewTitle
+    , Ui.el
+        [ Ui.width Ui.fill
+        , Ui.height (Ui.fillPortion 1)
+        , UiBackground.color
+            (attentionColor.rgb|>toRgb Ui.rgb)
+        , UiFont.color (Ui.rgb 1 1 1)
+        , Ui.paddingXY 20 0
+        ]
+        (Ui.el
+          [ Ui.centerY ]
+          (Ui.text catchPhrase)
+        )
+    ]
+
+viewTitle: Ui.Element msg
+viewTitle=
+  Ui.column
+    [ Ui.width Ui.fill
+    , Ui.height Ui.fill
     ]
     [ Ui.el
         [ Ui.width Ui.fill
@@ -627,43 +785,75 @@ attentionColor=
   { red= 0.0, green= 0.22, blue= 0.17 }
   |>withAlpha 0.51
 
-makeTitleScreen: List (Ui.Element Msg)
-makeTitleScreen= 
-  [ makeTitle
-  , Ui.el
-      [ Ui.width Ui.fill
-      , Ui.height (Ui.fillPortion 1)
-      , UiBackground.color
-          (attentionColor.rgb|>toRgb Ui.rgb)
-      , UiFont.color (Ui.rgb 1 1 1)
-      , Ui.paddingXY 20 0
-      ]
-      (Ui.el
-        [ Ui.centerY ]
-        (Ui.text catchPhrase)
-      )
-  ]
-
 catchPhrase: String
 catchPhrase=
   """
-    Make friendly code.
+    view friendly code.
 simple & fun
   """
 
+viewEditorScreen: Model ->Ui.Element Msg
+viewEditorScreen
+  { projects
+  , drag, belowMouse
+  , sizes, ticks
+  }
+  =
+  let selectedProject= ZipList.current projects
+      searchMorph id=
+        search id (.morphs selectedProject)
+  in
+  Ui.column
+    [ Ui.width Ui.fill
+    , Ui.height Ui.fill
+    , UiBackground.color (Ui.rgb 0 0 0)
+    ]
+    [ viewEditor
+        (.trunkMorph selectedProject)
+        searchMorph
+        (.selected selectedProject)
+        ticks
+        (case drag of
+          Drag-> Use.Svg.hand
+          NoDrag->
+            case belowMouse of
+              NotPressed-> Use.Svg.arrow
+              _-> Use.Svg.finger
+        )
+        sizes
 
-makeEditor:
+    , case .selected selectedProject of
+        EditorSelected maybeId->
+          viewEditorProperties
+            (.morphs selectedProject) maybeId
+
+        MorphSelected id->
+          (searchMorph id)
+          |>Maybe.map
+              (.name >>viewMorphProperties)
+          |>Maybe.withDefault Ui.none
+          
+        NothingSelected-> Ui.none
+
+    , viewOptions projects
+    ]
+
+editorColor: Ui.Color
+editorColor=
+  Ui.rgb 0.039 0.035 0.031
+
+viewEditor:
     Maybe Id ->(Id ->Maybe Morph)
   ->Selectable ->Int ->Use.Svg.Cursor
   ->Sizes
   ->Ui.Element Msg
-makeEditor
+viewEditor
   trunkId searchMorph
   selectable ticks cursor
   sizes
   =
   Ui.el
-    [ Ui.height (Ui.fillPortion 48)
+    [ Ui.height Ui.fill
     , Ui.width Ui.fill
     , Ui.height (Ui.fillPortion 9)
     , UiBackground.color editorColor
@@ -678,30 +868,30 @@ makeEditor
         , Mouse.onDown (\_->PressEditor)
         , Use.Svg.mouseMoves Move
         ]
-        [ makeTree
+        [ viewTree
             trunkId searchMorph
             selectable ticks sizes
         ]
       )
     )
 
-makeTree:
+viewTree:
     Maybe Id ->(Id ->Maybe Morph)
   ->Selectable ->Int ->Sizes
   ->Svg Msg
-makeTree
+viewTree
   trunk searchMorph
   selected ticks sizes
   =
   trunk
   |>Maybe.map
       (\id->
-        makeMorph
+        viewMorph
           id searchMorph
           selected ticks sizes
       )
   |>Maybe.withDefault
-      (makeNoMorph PlaceTrunk sizes)
+      (viewNoMorph PlaceTrunk sizes)
 
 expect:
     Maybe v ->Use.Svg.Size ->(v ->Svg msg)
@@ -710,7 +900,7 @@ expect maybeExists fontSize toSvg=
   maybeExists
   |>Maybe.map toSvg
   |>Maybe.withDefault
-      (makeLabel
+      (viewLabel
         fontSize
         "morph not found..."
       )
@@ -720,7 +910,7 @@ padded: number ->number ->number
 padded by length=
   by+ length +by
 
-makeMorph:
+viewMorph:
     Id ->(Id ->Maybe Morph)
   ->Selectable ->Int
   ->SizesInMorphSelected
@@ -733,7 +923,7 @@ makeMorph:
       }
     )
   ->Svg Msg
-makeMorph
+viewMorph
   morphId searchMorph
   selected ticks
   ({ fontSize
@@ -744,7 +934,7 @@ makeMorph
   )
   =
   expect (searchMorph morphId)
-    (Use.Svg.absolute fontSize)
+    (Use.Svg.px fontSize)
     (\{ name, translate, paddedTextWidth
       , input
       }->
@@ -758,7 +948,7 @@ makeMorph
             MorphSelected id->
               if (==) morphId id
               then
-                [ makeMorphSelected
+                [ viewMorphSelectedShadow
                     paddedTextWidth sizes ticks
                 ]
               else []
@@ -771,16 +961,16 @@ makeMorph
               (let begin= morphInputLineStart sizes
                    end= .translate input
               in
-              [ makeConnection groupColor
+              [ viewConnection groupColor
                   begin end sizes
-              , makeGroup
+              , viewGroup
                   morphId searchMorph
                   selected ticks
                   (rotation (combine (-) end begin)) sizes
                   input
               ]
               )
-          , makeMorphShape
+          , viewMorphShape
               morphId name
               (morphColor|>(toRgba Use.Svg.rgba))
               paddedTextWidth sizes
@@ -788,7 +978,7 @@ makeMorph
         )
     )
 
-makeGroup:
+viewGroup:
     Id ->(Id ->Maybe Morph)
   ->Selectable ->Int ->Float
   ->SizesInGroup
@@ -800,7 +990,7 @@ makeGroup:
       }
     ))
   ->Group ->Svg Msg
-makeGroup
+viewGroup
   outputId searchMorph
   selected ticks turn
   ({ lineWidth, fontSize
@@ -812,39 +1002,40 @@ makeGroup
   =
   Use.Svg.group
     [ Use.Svg.translate translate ]
-    ((makeGroupShape outputId turn sizes)
+    ((viewGroupShape outputId turn sizes)
     ::
     (input
-    |>MorphIds.values
+    |>Ids.values
     |>List.map
-        (\dock->
+        (\morph->
           let begin= morphInputLineStart sizes
           in
-          case dock of
-            Connected id->
-              [ expect (id|>searchMorph)
-                  (Use.Svg.absolute fontSize)
-                  (\inputMorph->
-                    let end= 
-                          .translate inputMorph
-                          |>mapX ((+) (moveInsideTriangle lineWidth))
-                    in
-                    makeConnection morphColor
-                      begin end sizes
-                  )
-              , makeMorph
-                  id searchMorph
-                  selected ticks sizes
-              ]
-            
-            NotConnected->
-              [ makeConnection noMorphColor
+          morph
+          |>Maybe.map
+              (\id->
+                [ expect (id|>searchMorph)
+                    (Use.Svg.px fontSize)
+                    (\inputMorph->
+                      let end= 
+                            .translate inputMorph
+                            |>mapX ((+) (moveInsideTriangle lineWidth))
+                      in
+                      viewConnection morphColor
+                        begin end sizes
+                    )
+                , viewMorph
+                    id searchMorph
+                    selected ticks sizes
+                ]
+              )
+          |>Maybe.withDefault
+              [ viewConnection noMorphColor
                   begin defaultMorphTranslate
                   sizes 
               , Use.Svg.group
                   [ Use.Svg.translate defaultMorphTranslate
                   ]
-                  [ makeNoMorph
+                  [ viewNoMorph
                       (AddInput outputId) sizes
                   ]
               ]
@@ -858,10 +1049,10 @@ type alias SizesInGroup a=
   | triangleCircumradius: Float
   , halfBoxHeight: Float
   }
-makeGroupShape:
+viewGroupShape:
     Id-> Float ->SizesInGroup a
   -> Svg Msg
-makeGroupShape
+viewGroupShape
   output turn
   { triangleCircumradius, halfBoxHeight }
   =
@@ -888,10 +1079,10 @@ type alias SizesInMorphSelected a=
   | triangleWidth: Float
   , halfBoxHeight: Float
   }
-makeMorphSelected:
+viewMorphSelectedShadow:
     Float ->SizesInMorphSelected a
   ->Int ->Svg msg
-makeMorphSelected
+viewMorphSelectedShadow
   paddedTextWidth
   { triangleWidth, halfBoxHeight }
   ticks
@@ -947,12 +1138,12 @@ type alias SizesInMorph a=
   , halfBoxHeight: Float
   , pad: Float
   }
-makeMorphShape:
+viewMorphShape:
     Id
   ->String ->Use.Svg.Color
   ->Float ->SizesInMorph a
   ->Svg Msg
-makeMorphShape
+viewMorphShape
   morphId name color
   textWidth
   { fontSize
@@ -973,8 +1164,8 @@ makeMorphShape
             , y= (-) halfBoxHeight pad
             }
         ]
-        [ makeLabel
-            (Use.Svg.absolute fontSize)
+        [ viewLabel
+            (Use.Svg.px fontSize)
             name
         ]
     ]
@@ -1028,8 +1219,7 @@ morphInputLineStart:
     }
   ->Translate
 morphInputLineStart { triangleWidth, lineWidth }=
-  x0y0
-  |>mapX
+  x0y0|>mapX
       (\_->
         (-) triangleWidth
           (moveInsideTriangle lineWidth)
@@ -1041,11 +1231,11 @@ type alias SizesInConnection a=
   , triangleCircumradius: Float
   , lineWidth: Float
   }
-makeConnection:
+viewConnection:
     Rgba ->Translate ->Translate
   ->SizesInConnection a
   ->Svg msg
-makeConnection
+viewConnection
   baseColor begin end
   ({ triangleWidth, triangleCircumradius, lineWidth }
     as sizes
@@ -1070,7 +1260,7 @@ makeConnection
         [ Use.Svg.fillColor Use.Svg.transparent
         , Use.Svg.lineColor color
         , Use.Svg.lineWidth
-            (Use.Svg.absolute lineWidth)
+            (Use.Svg.px lineWidth)
         , Use.Svg.linecap Use.Svg.roundCap
         ]
     ]
@@ -1083,10 +1273,10 @@ type alias SizesInNoMorph a=
   , lineWidth: Float
   , pad: Float
   }
-makeNoMorph:
+viewNoMorph:
   (Id ->Msg) ->SizesInNoMorph a
   ->Svg Msg
-makeNoMorph
+viewNoMorph
   generatedMsg
   { textHeight, pad, lineWidth }
   =
@@ -1104,7 +1294,7 @@ makeNoMorph
         (plusPoints plusArmLength)
         [ Use.Svg.translate { x= radius, y= 0 }
         , Use.Svg.lineWidth
-            (Use.Svg.absolute lineWidth)
+            (Use.Svg.px lineWidth)
         , Use.Svg.linecap Use.Svg.roundCap
         , Use.Svg.linejoin Use.Svg.roundJoin
         , Use.Svg.lineColor
@@ -1126,8 +1316,8 @@ morphFont: String
 morphFont=
   "Noto Sans"
 
-makeLabel: Use.Svg.Size ->String ->Svg msg
-makeLabel fontSize name=
+viewLabel: Use.Svg.Size ->String ->Svg msg
+viewLabel fontSize name=
   Use.Svg.text name
     [ Use.Svg.fillColor (Use.Svg.rgb 1 1 1)
     , Use.Svg.fontFamily morphFont
@@ -1141,27 +1331,36 @@ noTextSelect=
     "-webkit-user-select" "none"
 
 
-makeTabs:
-  IdDict Morph ->Selectable ->Ui.Element Msg
-makeTabs morphs selected=
-  Ui.row
-    [ Ui.spacing 8
-    , UiBackground.color (Ui.rgb 0 0 0)
-    , Ui.height (Ui.fillPortion 1)
-    , Ui.width (Ui.fillPortion 16)
-    ]
+viewTabRow:
+  List (Ui.Element msg) ->Ui.Element msg
+viewTabRow=
+  viewInput []
+  <<Ui.wrappedRow
+      [ Ui.spacing 8
+      , Ui.height Ui.fill
+      , Ui.width Ui.fill
+      ]
+
+viewMorphTabs:
+  IdDict Morph ->Maybe Id ->Ui.Element Msg
+viewMorphTabs morphs selected=
+  viewTabRow
     (let tab=
-          case selected of
-            MorphSelected selectedId->
-              (\id->
-                case (==) id selectedId of
-                  True->
-                    makeSelectedTab id
-                  False->
-                    makeUnselectedTab id
+          selected
+          |>Maybe.map
+              (\selectedId->
+                (\id->
+                  (case (==) id selectedId of
+                    True->
+                      viewSelectedTab
+                    False->
+                      viewUnselectedTab
+                  )
+                  <|SelectMorph id
+                )
               )
-            
-            _-> makeUnselectedTab
+          |>Maybe.withDefault
+              (viewUnselectedTab <<SelectMorph)
     in
     morphs
     |>mapEach
@@ -1172,84 +1371,195 @@ makeTabs morphs selected=
     |>values
     )
 
-makeTab:
-    Id ->String ->Ui.Color ->Int ->Ui.Color
-  ->Ui.Element Msg
-makeTab id name bgColor padY fontColor=
+viewTab:
+    Int ->Ui.Color ->msg ->String ->Ui.Color
+  ->Ui.Element msg
+viewTab padY fontColor onPress name bgColor=
   UiInput.button 
-    [ UiBackground.color editorColor
+    [ UiBackground.color bgColor
     , UiFont.color fontColor
     , Ui.paddingXY 4 padY
-    , Ui.alignTop
+    , Ui.height Ui.fill
     ]
-    { onPress= Just (ClickTab id),
+    { onPress= Just onPress,
       label=
         Ui.el
           [ Ui.centerY, Ui.centerX ]
           (Ui.text name)
     }
+viewUnselectedTab:
+  msg ->String ->Ui.Color ->Ui.Element msg
+viewUnselectedTab=
+  viewTab 4 (Ui.rgb 0.55 0.55 0.55)
 
-makeUnselectedTab:
-  Id ->String ->Ui.Color ->Ui.Element Msg
-makeUnselectedTab id name bgColor=
-  makeTab id name bgColor
-    4 (Ui.rgb 0.55 0.55 0.55)
+viewSelectedTab:
+  msg ->String ->Ui.Color ->Ui.Element msg
+viewSelectedTab=
+  viewTab 10 (Ui.rgb 1 1 1)
 
-makeSelectedTab:
-  Id ->String ->Ui.Color ->Ui.Element Msg
-makeSelectedTab id name bgColor=
-  makeTab id name bgColor
-    11 (Ui.rgb 1 1 1)
-
-
-makeMorphProperties: String ->Ui.Element Msg
-makeMorphProperties name=
-  UiInput.search
-    [ UiBackground.color editorColor
-    , UiFont.color (Ui.rgb 0.78 1 0.9)
-    , UiBorder.color editorColor
+viewInput:
+    List (Ui.Attribute msg)
+  ->Ui.Element msg
+  ->Ui.Element msg
+viewInput attrs inputElement=
+  Ui.column
+    ([ Ui.paddingXY 0 5 ]
+    ++attrs
+    )
+    [ Ui.el
+        [ Ui.height Ui.fill ]
+        (Ui.el
+          [ UiFont.color (Ui.rgb 1 1 1)
+          , Ui.padding 10
+          ]
+          inputElement
+        )
+    , Ui.el
+        [ Ui.width Ui.fill
+        , Ui.height (Ui.fill)
+        , Ui.paddingXY 5 0
+        ]
+        (Ui.html
+          (Svg.svg
+            [ Use.Svg.height (Use.Svg.px 2)
+            , Use.Svg.width (Use.Svg.relative 1)
+            ]
+            [ Svg.rect
+                [ Use.Svg.height (Use.Svg.relative 1)
+                , Use.Svg.width (Use.Svg.relative 1)
+                , Use.Svg.fillColor (Use.Svg.rgba 1 0.36 0 0.7)
+                ] []
+            ]
+          )
+        )
     ]
-    { onChange= RenameMorph
-    , text= name
-    , placeholder= Nothing
-    , label= UiInput.labelHidden "name"
-    }
 
-makeScaleButton: String ->msg ->Ui.Element msg
-makeScaleButton text msg=
-  UiInput.button
-    [ UiBackground.color editorColor
-    , UiFont.color (Ui.rgb 1 1 1)
-    , Ui.padding 10
-    ]
-    { label= Ui.text text, onPress= Just msg }
 
-makeEditorProperties: Ui.Element Msg
-makeEditorProperties=
+viewMorphProperties: String ->Ui.Element Msg
+viewMorphProperties name=
   Ui.row
     [ Ui.width Ui.fill
-    , UiBackground.color editorColor
     ]
-    [ makeScaleButton "+" (Scale ((/) 11 10))
-    , makeScaleButton "-" (Scale ((/) 10 11))
-    , makeDownloadButton
+    [ viewInput [ Ui.width Ui.fill ]
+        (UiInput.search
+          [ UiBackground.color (Ui.rgba 0 0 0 0)
+          , UiBorder.color (Ui.rgba 0 0 0 0)
+          , Ui.width Ui.fill
+          , Ui.height Ui.fill
+          , UiFont.family [ UiFont.typeface morphFont ]
+          --, selection color attentionColor
+          ]
+          { onChange= RenameMorph
+          , text= name
+          , placeholder= Nothing
+          , label= UiInput.labelHidden "name"
+          }
+        )
     ]
 
-makeDownloadButton: Ui.Element Msg
-makeDownloadButton=
-  Ui.el
-    [ UiBackground.color editorColor
-    , Ui.height Ui.fill
-    , Ui.padding 10
+viewEditorProperties:
+  IdDict Morph ->Maybe Id ->Ui.Element Msg
+viewEditorProperties morphs selected=
+  Ui.row
+    [ Ui.width Ui.fill
+    , Ui.spacing 4
     ]
-    (UiInput.button
-      []
+    [ Ui.row
+        [ Ui.width Ui.fill
+        ]
+        [ viewScaleButton "⌃" (Scale ((/) 11 10))
+        , viewScaleButton "⌄" (Scale ((/) 10 11))
+        ]
+    , viewMorphTabs morphs selected
+    ]
+
+viewScaleButton: String ->msg ->Ui.Element msg
+viewScaleButton text msg=
+  viewInput [ UiFont.family [ UiFont.monospace ] ]
+    (UiInput.button []
+      { label= Ui.text text
+      , onPress= Just msg
+      }
+    )
+
+
+viewOptions: ZipList Project ->Ui.Element Msg
+viewOptions projects=
+  Ui.row
+    [ Ui.width Ui.fill
+    ]
+    ([ viewSaveButton
+    , viewSelectButton
+    , viewAddBlankProjectButton
+    , viewProjectTabs projects
+    ]
+    |>List.map (Ui.el [ Ui.alignBottom ])
+    )
+
+viewSaveButton: Ui.Element Msg
+viewSaveButton=
+  viewInput []
+    (UiInput.button []
       { label=
           Ui.el
             [ UiFont.color (Ui.rgb 1 1 1)
+            , UiFont.family [ UiFont.sansSerif ]
+            , Ui.centerX
+            , Ui.centerY
             ]
-            (Ui.text "save")
+            (Ui.text "↧")
       , onPress= Just Save
       }
+    )
+
+viewSelectButton: Ui.Element Msg
+viewSelectButton=
+  viewInput []
+    (UiInput.button []
+      { label=
+          Ui.el
+            [ UiFont.color (Ui.rgb 1 1 1)
+            , UiFont.family [ UiFont.sansSerif ]
+            , Ui.centerX
+            , Ui.centerY
+            ]
+            (Ui.text "↥")
+      , onPress= Just Select
+      }
+    )
+
+viewAddBlankProjectButton: Ui.Element Msg
+viewAddBlankProjectButton=
+  viewInput []
+    (UiInput.button []
+      { label=
+          Ui.el
+            [ UiFont.color (Ui.rgb 1 1 1)
+            , UiFont.family [ UiFont.sansSerif ]
+            , Ui.centerX
+            , Ui.centerY
+            ]
+            (Ui.text "+")
+      , onPress= Just AddBlankProject
+      }
+    )
+
+viewProjectTabs: ZipList Project ->Ui.Element Msg
+viewProjectTabs projects=
+  viewTabRow
+    (projects
+    |>ZipList.indexedSelectedMap
+      (\index isSelected project->
+        case isSelected of
+          True->
+            viewSelectedTab (SelectProject index)
+              (.name project)
+              editorColor
+          False->
+            viewUnselectedTab (SelectProject index)
+              (.name project)
+              editorColor
+      )
+    |>ZipList.toList
     )
 

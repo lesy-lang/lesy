@@ -1,8 +1,9 @@
-module MorphIds exposing
+module Ids exposing
   ( Id, generateId
   , IdDict, empty
   , search, add, update, mapEach, values
-  , encodeId, encodeDict
+  , encodeId, decodeId
+  , encodeDict, decodeDict
   )
 
 import Dict
@@ -10,6 +11,7 @@ import Dict
 import Random
 import Random.Char
 import Json.Encode
+import Json.Decode
 
 
 {-|**8 of 143,859** valid characters [#0]
@@ -90,4 +92,21 @@ encodeDict encodeValue (IdDict dict)=
 encodeId: Id ->Json.Encode.Value
 encodeId (Id id)=
   Json.Encode.string (String.fromList id)
+
+decodeId: Json.Decode.Decoder Id
+decodeId=
+  Json.Decode.map (String.toList >>Id)
+    Json.Decode.string
+
+decodeDict:
+    Json.Decode.Decoder v
+  ->Json.Decode.Decoder (IdDict v)
+decodeDict decodeValue=
+  Json.Decode.keyValuePairs decodeValue
+  |>Json.Decode.map
+      (List.map
+        (Tuple.mapFirst String.toList)
+      >>Dict.fromList
+      >>IdDict
+      )
 

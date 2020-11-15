@@ -1,5 +1,5 @@
 module Use.Svg exposing
-  ( Size, relative, absolute
+  ( Size, relative, px
   , width, height
   , translate
 
@@ -26,7 +26,7 @@ module Use.Svg exposing
 import Svg exposing (Svg)
 import Svg.Attributes as SvgAttr
 import Svg.Events
-import Use.Translate exposing (Translate, xy)
+import Use.Translate exposing (Translate)
 
 import Json.Decode
 
@@ -41,7 +41,7 @@ type Size=
 
 {-|size compared to its parent
 
-    relative 1.0 == Length "100%" --True
+    relative 1.0 --Length "100%"
 -}
 relative: Float ->Size
 relative=
@@ -52,9 +52,11 @@ f0To1AsPercent f0To1=
   (String.fromFloat ((*) 100 f0To1))
   ++"%"
 
-absolute: Float ->Size
-absolute=
-  String.fromFloat >>Size
+px: Float ->Size
+px pixel=
+  String.fromFloat pixel
+  ++ "px"
+  |>Size
 
 
 height: Size ->Svg.Attribute msg
@@ -245,7 +247,7 @@ mouseMoves msg=
 
 decodeMouseMove: Json.Decode.Decoder Translate
 decodeMouseMove=
-  Json.Decode.map2 xy
+  Json.Decode.map2 Translate
     (Json.Decode.field
       "movementX" Json.Decode.float
     )
