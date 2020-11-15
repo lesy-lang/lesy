@@ -806,7 +806,6 @@ viewEditorScreen
   Ui.column
     [ Ui.width Ui.fill
     , Ui.height Ui.fill
-    , UiBackground.color (Ui.rgb 0 0 0)
     ]
     [ viewEditor
         (.trunkMorph selectedProject)
@@ -822,20 +821,27 @@ viewEditorScreen
         )
         sizes
 
-    , case .selected selectedProject of
-        EditorSelected maybeId->
-          viewEditorProperties
-            (.morphs selectedProject) maybeId
+    , Ui.column
+        [ Ui.width Ui.fill
+        , Ui.height Ui.fill
+        , Ui.spacing 6
+        , UiBackground.color (Ui.rgb 0 0 0)
+        ]
+        [ case .selected selectedProject of
+            EditorSelected maybeId->
+              viewEditorProperties
+                (.morphs selectedProject) maybeId
 
-        MorphSelected id->
-          (searchMorph id)
-          |>Maybe.map
-              (.name >>viewMorphProperties)
-          |>Maybe.withDefault Ui.none
-          
-        NothingSelected-> Ui.none
+            MorphSelected id->
+              (searchMorph id)
+              |>Maybe.map
+                  (.name >>viewMorphProperties)
+              |>Maybe.withDefault Ui.none
+              
+            NothingSelected-> Ui.none
 
-    , viewOptions projects
+        , viewOptions projects
+        ]
     ]
 
 editorColor: Ui.Color
@@ -1335,7 +1341,7 @@ viewTabRow:
   List (Ui.Element msg) ->Ui.Element msg
 viewTabRow=
   viewInput []
-  <<Ui.wrappedRow
+  <<Ui.row
       [ Ui.spacing 8
       , Ui.height Ui.fill
       , Ui.width Ui.fill
@@ -1378,7 +1384,7 @@ viewTab padY fontColor onPress name bgColor=
   UiInput.button 
     [ UiBackground.color bgColor
     , UiFont.color fontColor
-    , Ui.paddingXY 4 padY
+    , Ui.paddingXY 3 padY
     , Ui.height Ui.fill
     ]
     { onPress= Just onPress,
@@ -1390,12 +1396,12 @@ viewTab padY fontColor onPress name bgColor=
 viewUnselectedTab:
   msg ->String ->Ui.Color ->Ui.Element msg
 viewUnselectedTab=
-  viewTab 4 (Ui.rgb 0.55 0.55 0.55)
+  viewTab 3 (Ui.rgb 0.55 0.55 0.55)
 
 viewSelectedTab:
   msg ->String ->Ui.Color ->Ui.Element msg
 viewSelectedTab=
-  viewTab 10 (Ui.rgb 1 1 1)
+  viewTab 7 (Ui.rgb 1 1 1)
 
 viewInput:
     List (Ui.Attribute msg)
@@ -1403,21 +1409,20 @@ viewInput:
   ->Ui.Element msg
 viewInput attrs inputElement=
   Ui.column
-    ([ Ui.paddingXY 0 5 ]
+    ([ Ui.spacing 3 ]
     ++attrs
     )
     [ Ui.el
         [ Ui.height Ui.fill ]
         (Ui.el
           [ UiFont.color (Ui.rgb 1 1 1)
-          , Ui.padding 10
           ]
           inputElement
         )
     , Ui.el
         [ Ui.width Ui.fill
         , Ui.height (Ui.fill)
-        , Ui.paddingXY 5 0
+        , Ui.paddingXY 6 0
         ]
         (Ui.html
           (Svg.svg
@@ -1475,8 +1480,10 @@ viewEditorProperties morphs selected=
 
 viewScaleButton: String ->msg ->Ui.Element msg
 viewScaleButton text msg=
-  viewInput [ UiFont.family [ UiFont.monospace ] ]
-    (UiInput.button []
+  viewInput
+    [ UiFont.family [ UiFont.monospace ]
+    ]
+    (UiInput.button [ Ui.padding 7 ]
       { label= Ui.text text
       , onPress= Just msg
       }
@@ -1499,7 +1506,7 @@ viewOptions projects=
 viewSaveButton: Ui.Element Msg
 viewSaveButton=
   viewInput []
-    (UiInput.button []
+    (UiInput.button [ Ui.padding 7 ]
       { label=
           Ui.el
             [ UiFont.color (Ui.rgb 1 1 1)
@@ -1515,7 +1522,7 @@ viewSaveButton=
 viewSelectButton: Ui.Element Msg
 viewSelectButton=
   viewInput []
-    (UiInput.button []
+    (UiInput.button [ Ui.padding 7 ]
       { label=
           Ui.el
             [ UiFont.color (Ui.rgb 1 1 1)
@@ -1531,7 +1538,7 @@ viewSelectButton=
 viewAddBlankProjectButton: Ui.Element Msg
 viewAddBlankProjectButton=
   viewInput []
-    (UiInput.button []
+    (UiInput.button [ Ui.padding 7 ]
       { label=
           Ui.el
             [ UiFont.color (Ui.rgb 1 1 1)

@@ -13385,6 +13385,25 @@ var $author$project$Ids$search = F2(
 		var dict = _v1;
 		return A2($elm$core$Dict$get, id, dict);
 	});
+var $mdgriffith$elm_ui$Internal$Model$SpacingStyle = F3(
+	function (a, b, c) {
+		return {$: 5, a: a, b: b, c: c};
+	});
+var $mdgriffith$elm_ui$Internal$Flag$spacing = $mdgriffith$elm_ui$Internal$Flag$flag(3);
+var $mdgriffith$elm_ui$Internal$Model$spacingName = F2(
+	function (x, y) {
+		return 'spacing-' + ($elm$core$String$fromInt(x) + ('-' + $elm$core$String$fromInt(y)));
+	});
+var $mdgriffith$elm_ui$Element$spacing = function (x) {
+	return A2(
+		$mdgriffith$elm_ui$Internal$Model$StyleClass,
+		$mdgriffith$elm_ui$Internal$Flag$spacing,
+		A3(
+			$mdgriffith$elm_ui$Internal$Model$SpacingStyle,
+			A2($mdgriffith$elm_ui$Internal$Model$spacingName, x, x),
+			x,
+			x));
+};
 var $author$project$Main$Lift = {$: 11};
 var $author$project$Main$Move = function (a) {
 	return {$: 7, a: a};
@@ -14408,25 +14427,6 @@ var $mdgriffith$elm_ui$Element$row = F2(
 						attrs))),
 			$mdgriffith$elm_ui$Internal$Model$Unkeyed(children));
 	});
-var $mdgriffith$elm_ui$Internal$Model$SpacingStyle = F3(
-	function (a, b, c) {
-		return {$: 5, a: a, b: b, c: c};
-	});
-var $mdgriffith$elm_ui$Internal$Flag$spacing = $mdgriffith$elm_ui$Internal$Flag$flag(3);
-var $mdgriffith$elm_ui$Internal$Model$spacingName = F2(
-	function (x, y) {
-		return 'spacing-' + ($elm$core$String$fromInt(x) + ('-' + $elm$core$String$fromInt(y)));
-	});
-var $mdgriffith$elm_ui$Element$spacing = function (x) {
-	return A2(
-		$mdgriffith$elm_ui$Internal$Model$StyleClass,
-		$mdgriffith$elm_ui$Internal$Flag$spacing,
-		A3(
-			$mdgriffith$elm_ui$Internal$Model$SpacingStyle,
-			A2($mdgriffith$elm_ui$Internal$Model$spacingName, x, x),
-			x,
-			x));
-};
 var $author$project$Main$SelectMorph = function (a) {
 	return {$: 13, a: a};
 };
@@ -14628,7 +14628,7 @@ var $author$project$Main$viewTab = F5(
 				[
 					$mdgriffith$elm_ui$Element$Background$color(bgColor),
 					$mdgriffith$elm_ui$Element$Font$color(fontColor),
-					A2($mdgriffith$elm_ui$Element$paddingXY, 4, padY),
+					A2($mdgriffith$elm_ui$Element$paddingXY, 3, padY),
 					$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill)
 				]),
 			{
@@ -14642,21 +14642,8 @@ var $author$project$Main$viewTab = F5(
 	});
 var $author$project$Main$viewSelectedTab = A2(
 	$author$project$Main$viewTab,
-	10,
+	7,
 	A3($mdgriffith$elm_ui$Element$rgb, 1, 1, 1));
-var $mdgriffith$elm_ui$Element$padding = function (x) {
-	var f = x;
-	return A2(
-		$mdgriffith$elm_ui$Internal$Model$StyleClass,
-		$mdgriffith$elm_ui$Internal$Flag$padding,
-		A5(
-			$mdgriffith$elm_ui$Internal$Model$PaddingStyle,
-			'p-' + $elm$core$String$fromInt(x),
-			f,
-			f,
-			f,
-			f));
-};
 var $elm$svg$Svg$rect = $elm$svg$Svg$trustedNode('rect');
 var $author$project$Main$viewInput = F2(
 	function (attrs, inputElement) {
@@ -14665,7 +14652,7 @@ var $author$project$Main$viewInput = F2(
 			_Utils_ap(
 				_List_fromArray(
 					[
-						A2($mdgriffith$elm_ui$Element$paddingXY, 0, 5)
+						$mdgriffith$elm_ui$Element$spacing(3)
 					]),
 				attrs),
 			_List_fromArray(
@@ -14681,8 +14668,7 @@ var $author$project$Main$viewInput = F2(
 						_List_fromArray(
 							[
 								$mdgriffith$elm_ui$Element$Font$color(
-								A3($mdgriffith$elm_ui$Element$rgb, 1, 1, 1)),
-								$mdgriffith$elm_ui$Element$padding(10)
+								A3($mdgriffith$elm_ui$Element$rgb, 1, 1, 1))
 							]),
 						inputElement)),
 					A2(
@@ -14691,7 +14677,7 @@ var $author$project$Main$viewInput = F2(
 						[
 							$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$fill),
 							$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill),
-							A2($mdgriffith$elm_ui$Element$paddingXY, 5, 0)
+							A2($mdgriffith$elm_ui$Element$paddingXY, 6, 0)
 						]),
 					$mdgriffith$elm_ui$Element$html(
 						A2(
@@ -14720,207 +14706,19 @@ var $author$project$Main$viewInput = F2(
 								]))))
 				]));
 	});
-var $mdgriffith$elm_ui$Internal$Model$Padding = F5(
-	function (a, b, c, d, e) {
-		return {$: 0, a: a, b: b, c: c, d: d, e: e};
-	});
-var $mdgriffith$elm_ui$Internal$Model$Spaced = F3(
-	function (a, b, c) {
-		return {$: 0, a: a, b: b, c: c};
-	});
-var $mdgriffith$elm_ui$Internal$Model$extractSpacingAndPadding = function (attrs) {
-	return A3(
-		$elm$core$List$foldr,
-		F2(
-			function (attr, _v0) {
-				var pad = _v0.a;
-				var spacing = _v0.b;
-				return _Utils_Tuple2(
-					function () {
-						if (!pad.$) {
-							var x = pad.a;
-							return pad;
-						} else {
-							if ((attr.$ === 4) && (attr.b.$ === 7)) {
-								var _v3 = attr.b;
-								var name = _v3.a;
-								var t = _v3.b;
-								var r = _v3.c;
-								var b = _v3.d;
-								var l = _v3.e;
-								return $elm$core$Maybe$Just(
-									A5($mdgriffith$elm_ui$Internal$Model$Padding, name, t, r, b, l));
-							} else {
-								return $elm$core$Maybe$Nothing;
-							}
-						}
-					}(),
-					function () {
-						if (!spacing.$) {
-							var x = spacing.a;
-							return spacing;
-						} else {
-							if ((attr.$ === 4) && (attr.b.$ === 5)) {
-								var _v6 = attr.b;
-								var name = _v6.a;
-								var x = _v6.b;
-								var y = _v6.c;
-								return $elm$core$Maybe$Just(
-									A3($mdgriffith$elm_ui$Internal$Model$Spaced, name, x, y));
-							} else {
-								return $elm$core$Maybe$Nothing;
-							}
-						}
-					}());
-			}),
-		_Utils_Tuple2($elm$core$Maybe$Nothing, $elm$core$Maybe$Nothing),
-		attrs);
-};
-var $mdgriffith$elm_ui$Internal$Model$paddingNameFloat = F4(
-	function (top, right, bottom, left) {
-		return 'pad-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(top) + ('-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(right) + ('-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(bottom) + ('-' + $mdgriffith$elm_ui$Internal$Model$floatClass(left)))))));
-	});
-var $mdgriffith$elm_ui$Element$wrappedRow = F2(
-	function (attrs, children) {
-		var _v0 = $mdgriffith$elm_ui$Internal$Model$extractSpacingAndPadding(attrs);
-		var padded = _v0.a;
-		var spaced = _v0.b;
-		if (spaced.$ === 1) {
-			return A4(
-				$mdgriffith$elm_ui$Internal$Model$element,
-				$mdgriffith$elm_ui$Internal$Model$asRow,
-				$mdgriffith$elm_ui$Internal$Model$div,
-				A2(
-					$elm$core$List$cons,
-					$mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.aq + (' ' + ($mdgriffith$elm_ui$Internal$Style$classes.H + (' ' + $mdgriffith$elm_ui$Internal$Style$classes.bf)))),
-					A2(
-						$elm$core$List$cons,
-						$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$shrink),
-						A2(
-							$elm$core$List$cons,
-							$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$shrink),
-							attrs))),
-				$mdgriffith$elm_ui$Internal$Model$Unkeyed(children));
-		} else {
-			var _v2 = spaced.a;
-			var spaceName = _v2.a;
-			var x = _v2.b;
-			var y = _v2.c;
-			var newPadding = function () {
-				if (!padded.$) {
-					var _v5 = padded.a;
-					var name = _v5.a;
-					var t = _v5.b;
-					var r = _v5.c;
-					var b = _v5.d;
-					var l = _v5.e;
-					if ((_Utils_cmp(r, x / 2) > -1) && (_Utils_cmp(b, y / 2) > -1)) {
-						var newTop = t - (y / 2);
-						var newRight = r - (x / 2);
-						var newLeft = l - (x / 2);
-						var newBottom = b - (y / 2);
-						return $elm$core$Maybe$Just(
-							A2(
-								$mdgriffith$elm_ui$Internal$Model$StyleClass,
-								$mdgriffith$elm_ui$Internal$Flag$padding,
-								A5(
-									$mdgriffith$elm_ui$Internal$Model$PaddingStyle,
-									A4($mdgriffith$elm_ui$Internal$Model$paddingNameFloat, newTop, newRight, newBottom, newLeft),
-									newTop,
-									newRight,
-									newBottom,
-									newLeft)));
-					} else {
-						return $elm$core$Maybe$Nothing;
-					}
-				} else {
-					return $elm$core$Maybe$Nothing;
-				}
-			}();
-			if (!newPadding.$) {
-				var pad = newPadding.a;
-				return A4(
-					$mdgriffith$elm_ui$Internal$Model$element,
-					$mdgriffith$elm_ui$Internal$Model$asRow,
-					$mdgriffith$elm_ui$Internal$Model$div,
-					A2(
-						$elm$core$List$cons,
-						$mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.aq + (' ' + ($mdgriffith$elm_ui$Internal$Style$classes.H + (' ' + $mdgriffith$elm_ui$Internal$Style$classes.bf)))),
-						A2(
-							$elm$core$List$cons,
-							$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$shrink),
-							A2(
-								$elm$core$List$cons,
-								$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$shrink),
-								_Utils_ap(
-									attrs,
-									_List_fromArray(
-										[pad]))))),
-					$mdgriffith$elm_ui$Internal$Model$Unkeyed(children));
-			} else {
-				var halfY = -(y / 2);
-				var halfX = -(x / 2);
-				return A4(
-					$mdgriffith$elm_ui$Internal$Model$element,
-					$mdgriffith$elm_ui$Internal$Model$asEl,
-					$mdgriffith$elm_ui$Internal$Model$div,
-					attrs,
-					$mdgriffith$elm_ui$Internal$Model$Unkeyed(
-						_List_fromArray(
-							[
-								A4(
-								$mdgriffith$elm_ui$Internal$Model$element,
-								$mdgriffith$elm_ui$Internal$Model$asRow,
-								$mdgriffith$elm_ui$Internal$Model$div,
-								A2(
-									$elm$core$List$cons,
-									$mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.aq + (' ' + ($mdgriffith$elm_ui$Internal$Style$classes.H + (' ' + $mdgriffith$elm_ui$Internal$Style$classes.bf)))),
-									A2(
-										$elm$core$List$cons,
-										$mdgriffith$elm_ui$Internal$Model$Attr(
-											A2(
-												$elm$html$Html$Attributes$style,
-												'margin',
-												$elm$core$String$fromFloat(halfY) + ('px' + (' ' + ($elm$core$String$fromFloat(halfX) + 'px'))))),
-										A2(
-											$elm$core$List$cons,
-											$mdgriffith$elm_ui$Internal$Model$Attr(
-												A2(
-													$elm$html$Html$Attributes$style,
-													'width',
-													'calc(100% + ' + ($elm$core$String$fromInt(x) + 'px)'))),
-											A2(
-												$elm$core$List$cons,
-												$mdgriffith$elm_ui$Internal$Model$Attr(
-													A2(
-														$elm$html$Html$Attributes$style,
-														'height',
-														'calc(100% + ' + ($elm$core$String$fromInt(y) + 'px)'))),
-												A2(
-													$elm$core$List$cons,
-													A2(
-														$mdgriffith$elm_ui$Internal$Model$StyleClass,
-														$mdgriffith$elm_ui$Internal$Flag$spacing,
-														A3($mdgriffith$elm_ui$Internal$Model$SpacingStyle, spaceName, x, y)),
-													_List_Nil))))),
-								$mdgriffith$elm_ui$Internal$Model$Unkeyed(children))
-							])));
-			}
-		}
-	});
 var $author$project$Main$viewTabRow = A2(
-	$elm$core$Basics$composeR,
-	$mdgriffith$elm_ui$Element$wrappedRow(
+	$elm$core$Basics$composeL,
+	$author$project$Main$viewInput(_List_Nil),
+	$mdgriffith$elm_ui$Element$row(
 		_List_fromArray(
 			[
 				$mdgriffith$elm_ui$Element$spacing(8),
 				$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill),
 				$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$fill)
-			])),
-	$author$project$Main$viewInput(_List_Nil));
+			])));
 var $author$project$Main$viewUnselectedTab = A2(
 	$author$project$Main$viewTab,
-	4,
+	3,
 	A3($mdgriffith$elm_ui$Element$rgb, 0.55, 0.55, 0.55));
 var $author$project$Main$viewMorphTabs = F2(
 	function (morphs, selected) {
@@ -14972,6 +14770,19 @@ var $mdgriffith$elm_ui$Element$Font$family = function (families) {
 };
 var $mdgriffith$elm_ui$Internal$Model$Monospace = {$: 2};
 var $mdgriffith$elm_ui$Element$Font$monospace = $mdgriffith$elm_ui$Internal$Model$Monospace;
+var $mdgriffith$elm_ui$Element$padding = function (x) {
+	var f = x;
+	return A2(
+		$mdgriffith$elm_ui$Internal$Model$StyleClass,
+		$mdgriffith$elm_ui$Internal$Flag$padding,
+		A5(
+			$mdgriffith$elm_ui$Internal$Model$PaddingStyle,
+			'p-' + $elm$core$String$fromInt(x),
+			f,
+			f,
+			f,
+			f));
+};
 var $author$project$Main$viewScaleButton = F2(
 	function (text, msg) {
 		return A2(
@@ -14984,7 +14795,10 @@ var $author$project$Main$viewScaleButton = F2(
 				]),
 			A2(
 				$mdgriffith$elm_ui$Element$Input$button,
-				_List_Nil,
+				_List_fromArray(
+					[
+						$mdgriffith$elm_ui$Element$padding(7)
+					]),
 				{
 					ag: $mdgriffith$elm_ui$Element$text(text),
 					av: $elm$core$Maybe$Just(msg)
@@ -15408,6 +15222,10 @@ var $mdgriffith$elm_ui$Element$Input$isPixel = function (len) {
 		}
 	}
 };
+var $mdgriffith$elm_ui$Internal$Model$paddingNameFloat = F4(
+	function (top, right, bottom, left) {
+		return 'pad-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(top) + ('-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(right) + ('-' + ($mdgriffith$elm_ui$Internal$Model$floatClass(bottom) + ('-' + $mdgriffith$elm_ui$Internal$Model$floatClass(left)))))));
+	});
 var $mdgriffith$elm_ui$Element$Input$redistributeOver = F4(
 	function (isMultiline, stacked, attr, els) {
 		switch (attr.$) {
@@ -15975,7 +15793,10 @@ var $author$project$Main$viewAddBlankProjectButton = A2(
 	_List_Nil,
 	A2(
 		$mdgriffith$elm_ui$Element$Input$button,
-		_List_Nil,
+		_List_fromArray(
+			[
+				$mdgriffith$elm_ui$Element$padding(7)
+			]),
 		{
 			ag: A2(
 				$mdgriffith$elm_ui$Element$el,
@@ -16068,7 +15889,10 @@ var $author$project$Main$viewSaveButton = A2(
 	_List_Nil,
 	A2(
 		$mdgriffith$elm_ui$Element$Input$button,
-		_List_Nil,
+		_List_fromArray(
+			[
+				$mdgriffith$elm_ui$Element$padding(7)
+			]),
 		{
 			ag: A2(
 				$mdgriffith$elm_ui$Element$el,
@@ -16091,7 +15915,10 @@ var $author$project$Main$viewSelectButton = A2(
 	_List_Nil,
 	A2(
 		$mdgriffith$elm_ui$Element$Input$button,
-		_List_Nil,
+		_List_fromArray(
+			[
+				$mdgriffith$elm_ui$Element$padding(7)
+			]),
 		{
 			ag: A2(
 				$mdgriffith$elm_ui$Element$el,
@@ -16148,9 +15975,7 @@ var $author$project$Main$viewEditorScreen = function (_v0) {
 		_List_fromArray(
 			[
 				$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$fill),
-				$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill),
-				$mdgriffith$elm_ui$Element$Background$color(
-				A3($mdgriffith$elm_ui$Element$rgb, 0, 0, 0))
+				$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill)
 			]),
 		_List_fromArray(
 			[
@@ -16176,38 +16001,51 @@ var $author$project$Main$viewEditorScreen = function (_v0) {
 					}
 				}(),
 				sizes),
-				function () {
-				var _v3 = function ($) {
-					return $.X;
-				}(selectedProject);
-				switch (_v3.$) {
-					case 2:
-						var maybeId = _v3.a;
-						return A2(
-							$author$project$Main$viewEditorProperties,
-							function ($) {
-								return $.J;
-							}(selectedProject),
-							maybeId);
-					case 1:
-						var id = _v3.a;
-						return A2(
-							$elm$core$Maybe$withDefault,
-							$mdgriffith$elm_ui$Element$none,
-							A2(
-								$elm$core$Maybe$map,
-								A2(
-									$elm$core$Basics$composeR,
+				A2(
+				$mdgriffith$elm_ui$Element$column,
+				_List_fromArray(
+					[
+						$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$fill),
+						$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$fill),
+						$mdgriffith$elm_ui$Element$spacing(5),
+						$mdgriffith$elm_ui$Element$Background$color(
+						A3($mdgriffith$elm_ui$Element$rgb, 0, 0, 0))
+					]),
+				_List_fromArray(
+					[
+						function () {
+						var _v3 = function ($) {
+							return $.X;
+						}(selectedProject);
+						switch (_v3.$) {
+							case 2:
+								var maybeId = _v3.a;
+								return A2(
+									$author$project$Main$viewEditorProperties,
 									function ($) {
-										return $.s;
-									},
-									$author$project$Main$viewMorphProperties),
-								searchMorph(id)));
-					default:
-						return $mdgriffith$elm_ui$Element$none;
-				}
-			}(),
-				$author$project$Main$viewOptions(projects)
+										return $.J;
+									}(selectedProject),
+									maybeId);
+							case 1:
+								var id = _v3.a;
+								return A2(
+									$elm$core$Maybe$withDefault,
+									$mdgriffith$elm_ui$Element$none,
+									A2(
+										$elm$core$Maybe$map,
+										A2(
+											$elm$core$Basics$composeR,
+											function ($) {
+												return $.s;
+											},
+											$author$project$Main$viewMorphProperties),
+										searchMorph(id)));
+							default:
+								return $mdgriffith$elm_ui$Element$none;
+						}
+					}(),
+						$author$project$Main$viewOptions(projects)
+					]))
 			]));
 };
 var $author$project$Main$catchPhrase = '\n    view friendly code.\nsimple & fun\n  ';
