@@ -4,14 +4,12 @@ import Use.Math exposing (sin0To1, floorDivRem)
 
 
 pulse:
-    { min: Float
-    , max: Float
-    , loopFrames: Int
-    }
+  { min: Float, max: Float
+  , loopFrames: Int
+  }
   ->Int ->Float
 pulse { min, max, loopFrames } ticks=
-  ((+)
-    min
+  ((+) min
     ((*)
       (sin0To1 (floorDivRem ticks loopFrames))
       ((-) max min)

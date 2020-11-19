@@ -1,6 +1,9 @@
 port module Main exposing (main)
 
 {-|Editor for lesy
+
+- title screen
+- editor screen
 -}
 
 import Task
@@ -37,13 +40,22 @@ import File exposing (File)
 import File.Download
 import File.Select
 
-import Json.Encode
-import Json.Decode
-import Use.Encode
+import Json.Encode as Encode
+import Json.Decode as Decode exposing (Decoder)
+import Use.Json exposing (..)
 
-import Use.List
+import Dict exposing (Dict)
+import Use.Collection
 import ZipList exposing (ZipList)
-import Ids exposing (..)
+import Id exposing (..)
+import Use.Misc exposing
+  (oneAs100Percent, noTextSelect)
+import ZipList
+import Id
+import Array exposing (Array)
+import Use.Json exposing (decodeDict)
+import Svg exposing (view)
+import Json.Decode exposing (index)
 
 
 main: Program () Model Msg
@@ -56,110 +68,300 @@ main=
     }
 
 
-type alias Morph=
-  Translated
-    { name: String
-    , input: Group
-    , paddedTextWidth: Float
-    }
-encodeMorph: Morph ->Json.Encode.Value
-encodeMorph {translate, name, input, paddedTextWidth}=
-  Json.Encode.object
-    [ ( "translate", Use.Translate.encode translate )
-    , ( "name", Json.Encode.string name )
-    , ( "input", encodeGroup input )
-    , ( "paddedTextWidth"
-      , Json.Encode.float paddedTextWidth
-      )
+type alias BranchingOffIndex=
+  Int
+
+encodeBranchingOffIndex: BranchingOffIndex ->Encode.Value
+encodeBranchingOffIndex=
+  Encode.int
+decodeBranchingOffIndex: Decoder BranchingOffIndex
+decodeBranchingOffIndex=
+  Decode.int
+
+type alias DefinitionId=
+  Id.Id
+
+encodeDefinitionId: Id -> Encode.Value
+encodeDefinitionId=
+  Id.encode
+decodeDefinitionId: Decoder Id
+decodeDefinitionId=
+  Id.decode
+
+type BranchGap=
+  BranchingFurther BranchingOffIndex
+  | BranchMissing BranchingOffIndex DefinitionId
+
+encodeBranchGap gap=
+  Encode.object
+    [ case gap of
+        BranchingFurther index->
+          ( "BranchingFurther"
+          , Encode.object 
+              [ ( "branchingOffIndex"
+                , encodeBranchingOffIndex index
+                )
+              ]
+          )
+        BranchMissing index id->
+          ( "BranchMissing"
+          , Encode.object
+              [ ( "branchingOffIndex"
+                , encodeBranchingOffIndex index
+                )
+              , ( "definitionId", encodeDefinitionId id )
+              ]
+          )
     ]
-decodeMorph: Json.Decode.Decoder Morph
-decodeMorph=
-  Json.Decode.map4
-    (\off name input width->
-      { translate= off, name= name, input= input
-      , paddedTextWidth= width
-      }
-    )
-    (Json.Decode.field
-      "translate" Use.Translate.decode
-    )
-    (Json.Decode.field
-      "name" Json.Decode.string
-    )
-    (Json.Decode.field
-      "input" decodeGroup
-    )
-    (Json.Decode.field
-      "paddedTextWidth" Json.Decode.float
-    )
-
-type alias Group=
-  Translated 
-    { input: IdDict (Maybe Id) }
-encodeGroup: Group ->Json.Encode.Value
-encodeGroup group=
-  Json.Encode.object
-    [ ( "translate"
-      , Use.Translate.encode (.translate group)
-      )
-    , ( "input"
-      , Ids.encodeDict
-          (Use.Encode.encodeMaybe Ids.encodeId)
-          (.input group)
-      )
-    ]
-
-
-decodeGroup: Json.Decode.Decoder Group
-decodeGroup=
-  Json.Decode.map2
-    (\off input-> { translate= off, input= input })
-    (Json.Decode.field
-      "translate" Use.Translate.decode
-    )
-    (Json.Decode.field
-      "input"
-      (Ids.decodeDict
-        (Json.Decode.nullable Ids.decodeId
+decodeBranchGap: Decoder BranchGap
+decodeBranchGap=
+  Decode.oneOf
+    [ Decode.field "BranchingFurther"
+        (Decode.map BranchingFurther
+          (Decode.field
+            "branchingOffIndex" decodeBranchingOffIndex
+          )
         )
-      )
-    )
+    , Decode.field "BranchMissing"
+        (Decode.map2 BranchMissing
+          (Decode.field
+            "branchingOffIndex" decodeBranchingOffIndex
+          )
+          (Decode.field
+            "definitionId" decodeDefinitionId
+          )
+        )
+    ]
 
+{-| all branch-indexes
+- leading or
+- not leading
+
+to (or from) a `BranchOff`.
+-}
+type alias BranchGaps=
+  Dict DefinitionId BranchGap
+
+encodingReadability: Int
+encodingReadability= 3
+
+encodeBranchGaps: BranchGaps ->Encode.Value
+encodeBranchGaps=
+  encodeDict encodingReadability
+    encodeDefinitionId encodeBranchGap
+
+decodeBranchGaps: Decoder BranchGaps
+decodeBranchGaps=
+  decodeDict
+    decodeDefinitionId decodeBranchGap
+
+type alias BranchOff a=
+  Translated
+    {a
+    | definitionIndex: BranchingOffIndex
+    , incomingBranchGaps: BranchGaps
+    , outgoingBranchGaps: BranchGaps
+    }
+type alias Definition=
+  BranchOff 
+    { id: DefinitionId
+    , name: String--will be in a lower level definition
+    , textWidth: Float
+    }
+type BranchingOff=
+  Defined (BranchOff {})
+  | Definition Definition
+
+encodeBranchingOff: BranchingOff ->Encode.Value
+encodeBranchingOff branchingOff=
+  let sharedFields
+        { translate, definitionIndex
+        , incomingBranchGaps, outgoingBranchGaps
+        }
+        =
+        [ ( "translate"
+          , Use.Translate.encode translate
+          )
+        , ( "definitionIndex"
+          , encodeBranchingOffIndex definitionIndex
+          )
+        , ( "incomingBranchGaps"
+          , encodeBranchGaps incomingBranchGaps
+          )
+        , ( "outgoingBranchGaps"
+          , encodeBranchGaps outgoingBranchGaps
+          )
+        ]
+  in
+  Encode.object
+    (case branchingOff of
+      Defined branchOff->
+        sharedFields branchOff
+      
+      Definition
+        ({ id, name, textWidth } as definition)
+        ->
+        (sharedFields definition)
+        ++
+        [ ( "id", encodeDefinitionId id )
+        , ( "name", Encode.string name )
+        , ( "textWidth"
+          , Encode.float textWidth
+          )
+        ]
+    )
+decodeBranchingOff: Decoder BranchingOff
+decodeBranchingOff=
+  let translateField=
+        (Decode.field
+          "translate" Use.Translate.decode
+        )
+      definitionIndexField=
+        (Decode.field
+          "definitionIndex" decodeBranchingOffIndex
+        )
+      incomingBranchGapsField=
+        (Decode.field
+          "incomingBranchGaps" decodeBranchGaps
+        )
+      outgoingBranchGapsField=
+        (Decode.field
+          "outgoingBranchGaps" decodeBranchGaps
+        )
+  in
+  Decode.oneOf
+    [ Decode.map4
+        (\off defIndex incoming outgoing->
+          Defined
+            { translate= off
+            , definitionIndex= defIndex
+            , incomingBranchGaps= incoming
+            , outgoingBranchGaps= outgoing
+            }
+        )
+        translateField
+        definitionIndexField
+        outgoingBranchGapsField
+        incomingBranchGapsField
+
+    , Decode.map7
+        (\off defIndex incoming outgoing
+          id name width
+          ->
+          Definition
+            { translate= off
+            , definitionIndex= defIndex
+            , incomingBranchGaps= incoming
+            , outgoingBranchGaps= outgoing
+            , id= id
+            , name= name
+            , textWidth= width
+            }
+        )
+        translateField
+        definitionIndexField
+        outgoingBranchGapsField
+        incomingBranchGapsField
+        (Decode.field
+          "id" decodeDefinitionId
+        )
+        (Decode.field
+          "name" Decode.string
+        )
+        (Decode.field
+          "textWidth" Decode.float
+        )
+    ]
 
 move:
-  Translate ->Translated a ->Translated a
-move off=
-  updateTranslate (combine (+) off)
+  Translate ->BranchingOff ->BranchingOff
+move off branchingOff=
+  let moveOff= updateTranslate (combine (+) off)
+  in
+  case branchingOff of
+    Defined defined->
+      moveOff defined |>Defined
+    
+    Definition definition->
+      moveOff definition |>Definition
+      
 
-type Selectable=
-    NothingSelected
-  | MorphSelected Id
-  | EditorSelected (Maybe Id)
+type Selected=
+  NothingSelected
+  | BranchingOffSelected BranchingOffIndex
+  | EditorSelected (Maybe BranchingOffIndex)
 
-type Pressable=
-    MorphPressed Id
-  | NoMorphPressed (Id ->Msg)
-  | GroupPressed Id
+encodeSelected: Selected ->Encode.Value
+encodeSelected selected=
+  case selected of
+    NothingSelected->
+      Encode.string "NothingSelected"
+
+    BranchingOffSelected index->
+      Encode.object
+        [ ( "BranchingOffSelected"
+          , Encode.object
+              [ ( "branchingOffIndex"
+                , encodeBranchingOffIndex index
+                )
+              ]
+          )
+        ]
+    EditorSelected potentialSelectedBranch->
+      Encode.object
+        [ ( "EditorSelected"
+          , Encode.object
+              [ ( "potentialSelectedbranchingOffIndex"
+                , encodeNullable encodeBranchingOffIndex
+                    potentialSelectedBranch
+                )
+              ]
+          )
+        ]
+decodeSelected: Decoder Selected
+decodeSelected=
+  Decode.oneOf
+    [ Decode.field
+        "NothingSelected" (Decode.succeed NothingSelected)
+    , Decode.field
+        "EditorSelected"
+        (Decode.map EditorSelected
+          (Decode.field
+            "potentialSelectedbranchingOffIndex"
+            (Decode.nullable decodeBranchingOffIndex)
+          )
+        )
+    , Decode.field
+        "BranchingOffSelected"
+        (Decode.map BranchingOffSelected
+          (Decode.field
+            "branchingOffIndex" decodeBranchingOffIndex
+          )
+        )
+    ]
+
+type Pressed=
+  BranchingOffPressed BranchingOffIndex
+  | MissingBranchingOffPressed
+      BranchingOffIndex DefinitionId
   | NotPressed
 
 type Drag=
-    Drag
+  Drag
   | NoDrag
 
-{-would like to eliminate this-}
+--would like to eliminate this
 type EditorPressed=
-    EditorPressed
+  EditorPressed
   | EditorNotPressed
 
 type alias Sizes=
-  SizesInMorphSelected
-  (SizesInMorph
-  (SizesInNoMorph
-  (SizesInGroup
+  SizesInBranchOffSelected
+  (SizesInBranchOff
+  (SizesInMissingBranchOff
+  (SizesInBranchOff
   (SizesInConnection
-    { defaultMorphTranslate: Translate
-    , trunkTranslate: Translate
-    , defaultGroupTranslate: Translate
+    { defaultTranslate: Translate
     }
   ))))
 
@@ -180,39 +382,109 @@ scaleSizes scale=
       (*) triangleWidth ((/) 2 3)
   , pad= pad
   , lineWidth= 3.9|>scale
-  , defaultMorphTranslate=
+  , defaultTranslate=
       { x= 64, y= 0 }|>mapXY scale
-  , trunkTranslate=
-      { x= 140, y= 300 }|>mapXY scale
-  , defaultGroupTranslate=
-      { x= 48, y= 0 }|>mapXY scale
   }
 
 type alias Project=
   { name: String
-  , selected: Selectable
-  , trunkMorph: Maybe Id
-  , morphs: IdDict Morph
+  , selected: Selected
+  , branchingOffs: Dict BranchingOffIndex BranchingOff
   }
+trunkIndex: BranchingOffIndex
+trunkIndex= 0
+
+appDefinitionId: DefinitionId
+appDefinitionId=
+  "todo!xyz"|>String.toList--todo
+
+{-| **TODO.**
+Will contain mostly native and core definitions, e.g.
+- character
+- rational / irational number
+- group (a typesafe dict)
+
+To create those, we would need a seperated program
+to generate ids and compute the text width.
+-}
+basicDefinitions:
+  {a| defaultTranslate: Translate }
+  ->Dict BranchingOffIndex BranchingOff
+basicDefinitions { defaultTranslate }=
+  Dict.empty
+  |>Dict.insert trunkIndex
+      (Definition
+        { translate= defaultTranslate
+        , definitionIndex= trunkIndex--todo, there must be a definition
+        , incomingBranchGaps= Dict.empty--todo
+        , outgoingBranchGaps= Dict.empty
+        , id= appDefinitionId
+        , name= "app"
+        , textWidth= 20--todo
+        }
+      )
+
+blankProject:
+  {a| defaultTranslate: Translate } ->Project
+blankProject ({defaultTranslate} as sizes)=
+  { name= "not-named"
+  , selected= NothingSelected
+  , branchingOffs=
+      basicDefinitions sizes
+  }
+  
+encodeProject: Project ->Encode.Value
+encodeProject
+  { name, selected, branchingOffs }
+  =
+  Encode.object
+    [ ( "name", Encode.string name )
+    , ( "selected", encodeSelected selected )
+    , ( "branchingOffs"
+      , encodeDict encodingReadability
+          encodeBranchingOffIndex encodeBranchingOff
+          branchingOffs
+      )
+    ]
+decodeProject: Decoder Project
+decodeProject=
+  Decode.map3 Project
+    (Decode.field
+      "name" Decode.string
+    )
+    (Decode.field
+      "selected" decodeSelected 
+    )
+    (Decode.field
+      "branchingOffs"
+      (decodeDict
+        decodeBranchingOffIndex decodeBranchingOff
+      )
+    )
+  
 
 type alias Model=
   { ticks: Int
   
-  , pressed: Pressable
+  , pressed: Pressed
   , drag: Drag
-  , belowMouse: Pressable
+  , belowMouse: Pressed
   , editorPressed: EditorPressed
 
   , scale: Float ->Float
   
   , projects: ZipList Project
-  , waitingForComputedTextWidth: List Id
+  , waitingForComputedTextWidth:
+      Maybe (ZipList BranchingOffIndex)
   , sizes: Sizes
   }
 
 init: () ->( Model, Cmd Msg )
 init flags=
-  ( { ticks= 0
+  ( let scale= (*) 1
+        sizes= scaleSizes scale
+    in
+    { ticks= 0
 
     , pressed= NotPressed
     
@@ -221,96 +493,38 @@ init flags=
     , belowMouse= NotPressed
 
     , projects=
-        ZipList.singleton blankProject
-    , waitingForComputedTextWidth= []
+        ZipList.singleton
+          (blankProject sizes)
+    , waitingForComputedTextWidth= Nothing
 
-    , scale= (*) 1
-    , sizes= scaleSizes ((*) 1)
+    , scale= scale
+    , sizes= sizes
     }
 
-  , generateId PlaceTrunk
-    --dummy morph for testing
+  , Cmd.none
   )
-
-blankProject: Project
-blankProject=
-  { name= "not-named"
-  , morphs= Ids.empty
-  , trunkMorph= Nothing
-  , selected= NothingSelected
-  }
-
+type alias ProjectIndex=
+  Int
 
 type Msg=
-    FrameTick
+  FrameTick
   | Save
   | Select
   | RecieveSelectFile File
   | RecieveSelect String
   | AddBlankProject
-  | SelectProject Int
+  | RenameProject String
+  | SelectProject ProjectIndex
   | Move Translate
-  | Press Pressable
+  | Press Pressed
   | PressEditor
-  | MouseOn Pressable
+  | MouseOn Pressed
   | Lift
   | Scale Float
-  | SelectMorph Id
-  | RenameMorph String
-  | PlaceTrunk Id
-  | AddInput Id Id
+  | SelectBranchingOff BranchingOffIndex
+  | RenameBranchingOff String
+  | AddIncomingBranchingOff BranchingOff
   | RecieveComputedTextWidth Float
-
-encodeState:
-    Maybe Id-> IdDict Morph
-  ->Json.Encode.Value
-encodeState trunk morphs=
-  Json.Encode.object
-    [ ( "trunk"
-      , trunk
-        |>Maybe.map
-            Ids.encodeId
-        |>Maybe.withDefault
-            (Json.Encode.string "")
-      )
-    , ( "morphs"
-      , Ids.encodeDict
-          encodeMorph morphs
-      )
-    ]
-decodeState: String ->Model ->Model
-decodeState content model=
-  let orFail=
-        Result.withDefault model
-        --failed. maybe a dialog?
-  in
-  Json.Decode.decodeString
-    (Json.Decode.field
-      "morphs" (Ids.decodeDict decodeMorph)
-    )
-    content
-  |>Result.map
-      (\morphs->
-        Json.Decode.decodeString
-          (Json.Decode.field
-            "trunk" (Json.Decode.maybe Ids.decodeId)
-          )
-          content
-        |>Result.map
-            (\trunk->
-              {model
-              | projects=
-                  ZipList.insert
-                    {blankProject
-                    | trunkMorph= trunk
-                    , morphs= morphs
-                    }
-                    (.projects model)
-              }
-            )
-        |>orFail
-      )
-  |>orFail
 
 update: Msg ->Model ->( Model, Cmd Msg )
 update msg ({sizes} as model)=
@@ -324,13 +538,13 @@ update msg ({sizes} as model)=
     
     Save->
       ( model
-      , File.Download.string
-          "not-named.lesy.json" "application/json"
-          (let project= ZipList.current (.projects model)
-          in
-          encodeState
-            (.trunkMorph project) (.morphs project)
-          |>Json.Encode.encode 4
+      , let project= ZipList.current (.projects model)
+        in
+        File.Download.string
+          ((.name project)++".lesy.json")
+          "application/json"
+          (encodeProject project
+          |>Encode.encode encodingReadability
           )
       )
     
@@ -354,65 +568,77 @@ update msg ({sizes} as model)=
           ( model, Cmd.none )
     
     RecieveSelect content->
-      ( decodeState content model
+      ( Decode.decodeString decodeProject content
+        |>Result.map
+            (\project->
+              {model
+              | projects=
+                  ZipList.insert project
+                    (.projects model)
+              }
+            )
+        |>Result.withDefault 
+            model--failed. a dialog?
       , Cmd.none
       )
     
     AddBlankProject->
       ( {model
         | projects=
-            ZipList.insert blankProject
+            ZipList.insert
+              (blankProject (.sizes model))
               (.projects model)
         }
-      , generateId PlaceTrunk
+      , Cmd.none
+      )
+    
+    RenameProject name->
+      ( {model
+        | projects=
+            Use.Collection.updateSelected
+              (\project-> {project | name= name })
+              (.projects model)
+        }
+      , Cmd.none
       )
     
     SelectProject index->
       ( {model
         | projects=
             ZipList.goToIndex index (.projects model)
-            |>Maybe.withDefault (.projects model)
+            |>Maybe.withDefault
+                (.projects model)
         }
       , Cmd.none
       )
     
     Move off->
-      ( let dragMorph id=
-              inDrag Drag
-              <|(updateMorph id (move off)
-                |>forSelectedProject
+      ( case .pressed model of
+          BranchingOffPressed index->
+            inDrag Drag
+            <|(forSelectedProject
+                (updateBranchingOff index
+                  (Maybe.map (move off))
                 )
-              <|model
-        in
-        case .pressed model of
-          MorphPressed id->
-            dragMorph id
+              )
+            <|model
           
           NotPressed->
             case .editorPressed model of
               EditorPressed->
-                .trunkMorph (ZipList.current (.projects model))
-                |>Maybe.map dragMorph
-                |>Maybe.withDefault model
+                inDrag Drag
+                <|(forSelectedProject
+                    (updateBranchingOff trunkIndex
+                      (Maybe.map (move off))
+                    )
+                  )
+                <|model
 
               EditorNotPressed->
                 model
           
-          NoMorphPressed _->
+          MissingBranchingOffPressed _ _->
             model
-          
-          GroupPressed output->
-            inDrag Drag
-            <|(forSelectedProject
-                (updateMorph output
-                  (\morph->
-                    {morph
-                    | input= move off (.input morph)
-                    }
-                  )
-                )
-              )
-            <|model
 
       , Cmd.none
       )
@@ -437,7 +663,7 @@ update msg ({sizes} as model)=
                           (EditorSelected
                             (case .selected (ZipList.current (.projects model)) of
                               EditorSelected maybeId-> maybeId
-                              MorphSelected id-> Just id
+                              BranchingOffSelected id-> Just id
                               NothingSelected-> Nothing
                             )
                           )
@@ -448,24 +674,20 @@ update msg ({sizes} as model)=
               , Cmd.none
               )
             
-            MorphPressed id->
+            BranchingOffPressed index->
               ( upModel
                 |>(forSelectedProject
-                    (inSelect (MorphSelected id))
+                    (inSelect (BranchingOffSelected index))
                   )
               , Cmd.none
               )
             
-            NoMorphPressed createMsg->
+            MissingBranchingOffPressed index definition->
               ( upModel
-                |>(inSelect NothingSelected
-                  |>forSelectedProject
-                  )
-              , Ids.generateId createMsg
+                |>forSelectedProject
+                    (inSelect NothingSelected)
+              , Cmd.none
               )
-            
-            GroupPressed output->
-              ( upModel, Cmd.none )
                 
         Drag->
           ( upModel, Cmd.none )
@@ -490,112 +712,130 @@ update msg ({sizes} as model)=
       )
     
     Scale factor->
-      ( forSelectedProject
-          (updateMorphs
-            (mapEach
-                (\_ morph->
-                  updateTranslate
-                    (mapXY ((*) factor))
-                    {morph
-                    | paddedTextWidth= 
-                        (*) factor (.paddedTextWidth morph)
-                    , input=
-                        updateTranslate (mapXY ((*) factor))
-                          (.input morph)
-                    }
+      ( let lastFactor= (.scale model) 1
+            scale= (*) ((*) factor lastFactor)
+        in
+        {model
+        | scale= scale
+        , sizes= scaleSizes scale
+        }
+        |>forSelectedProject
+            (updateBranchingOffs
+              (Dict.map
+                (\_ branchingOff->
+                  let scaleTranslate= 
+                        updateTranslate
+                          (mapXY ((*) factor))
+                  in
+                  case branchingOff of
+                    Defined branchOff->
+                      scaleTranslate branchOff
+                      |>Defined
+                      
+                    Definition definition->
+                      scaleTranslate definition
+                      |>Definition
+                      
                 )
+              )
             )
-          )
-        <|let lastFactor= (.scale model) 1
-              scale= (*) ((*) factor lastFactor)
-          in
-          {model
-          | scale= scale
-          , sizes= scaleSizes scale
-          }
       , Cmd.none
       )
     
-    SelectMorph to->
-      ( (inSelect (MorphSelected to)
-         |>forSelectedProject
+    SelectBranchingOff branchingOff->
+      ( (forSelectedProject
+          (inSelect (BranchingOffSelected branchingOff)
+          )
         )
         <|model
       , Cmd.none
       )
     
-    RenameMorph to->
-      ( case .selected (ZipList.current (.projects model)) of
-          MorphSelected id->
-            forSelectedProject
-              (updateMorph id 
-                (\morph-> {morph | name= to })
-              )
-            <|{model
-              | waitingForComputedTextWidth=
-                  id::(.waitingForComputedTextWidth model)
-              }
-          
-          _ ->model
-      , computeMorphTextWidth to
-      )
-    
-    PlaceTrunk id->
-      addMorph id (.trunkTranslate sizes)
-      <|(inTrunk (Just id)|>forSelectedProject)
-      <|model
-    
-    AddInput toId ownId->
-      model
-      |>forSelectedProject
-          (updateMorph toId
-              (\morph->
-                let morphInput= .input morph
-                    groupInput= .input morphInput
-                in
-                {morph
-                | input=
-                    {morphInput
-                    | input=
-                        Ids.update
-                          toId (\_-> Just ownId)
-                        <|groupInput
-                    }
-                }
-              )
-          )
-      |>addMorph ownId
-          (.defaultMorphTranslate sizes)
-    
-    RecieveComputedTextWidth width->
-      ( List.head (.waitingForComputedTextWidth model)
-        |>Maybe.map
-          (\id->
+    RenameBranchingOff to->
+      ( case .selected (ZipList.current (.projects model))
+          of
+          BranchingOffSelected branchingOffIndex->
             {model
             | waitingForComputedTextWidth=
-                Use.List.removeHead
-                  (.waitingForComputedTextWidth model)
+                .waitingForComputedTextWidth model
+                |>Maybe.map
+                    (ZipList.insertAfter branchingOffIndex)
+                |>Maybe.withDefault
+                    (ZipList.singleton branchingOffIndex)
+                |>Just
             }
             |>forSelectedProject
-                (updateMorph id
-                  (\morph->
-                    { morph
-                    | paddedTextWidth=
-                        ((*) width (.fontSize sizes))
-                        |>padded (.pad sizes)
-                    }
+                (updateBranchingOff branchingOffIndex
+                  (Maybe.map
+                    (\mustBeDef->
+                      case mustBeDef of
+                        Definition def->
+                          Definition {def | name= to }
+                          
+                        Defined defined->
+                          Defined defined
+                    )
                   )
                 )
-          )
-          |>Maybe.withDefault model
+          
+          _-> model
+
+      , computeBranchOffTextWidth to
+      )
+    
+    AddIncomingBranchingOff branchOff->
+      ( model
+        |>forSelectedProject
+            (addAndSelectBranchOff
+              branchOff-- (.sizes model)
+            )
       , Cmd.none
       )
+    
+    RecieveComputedTextWidth width->
+      let waiting= .waitingForComputedTextWidth model
+      in
+      waiting
+      |>Maybe.map
+          (\alreadySomeWaiting->
+            ( let removed= ZipList.current alreadySomeWaiting
+                  without=
+                    ZipList.remove alreadySomeWaiting
+              in
+              {model
+              | waitingForComputedTextWidth= without
+              }
+              |>forSelectedProject
+                  (updateBranchingOff removed
+                    (Maybe.map
+                      (\shouldBeDef->
+                        case shouldBeDef of
+                          Definition def->
+                            Definition
+                              {def
+                              | textWidth= (*) width (.fontSize sizes)
+                              }
+                          Defined defined->
+                            Defined defined
+                      )
+                    )
+                  )
+            , Cmd.none
+            )
+          )
+      |>Maybe.withDefault
+          ( model, Cmd.none )
+
+nextFreeIndex:
+  Dict Int v ->Int
+nextFreeIndex=
+  Dict.keys >>List.foldr max 0
 
 inDrag: Drag ->Model ->Model
 inDrag drag model=
   {model | drag= drag }
 
-inPressed: Pressable ->Model ->Model
+inPressed: Pressed ->Model ->Model
 inPressed mouseDownOn model=
   {model | pressed= mouseDownOn }
 
@@ -604,64 +844,96 @@ forSelectedProject:
 forSelectedProject change model=
   {model
   | projects=
-      Use.List.updateSelected
+      Use.Collection.updateSelected
       change (.projects model)
   }
 
-inTrunk: Maybe Id ->Project ->Project
-inTrunk trunk project=
-  {project | trunkMorph= trunk }
-
-updateMorphs:
-    (IdDict Morph ->IdDict Morph)
-  ->Project ->Project
-updateMorphs change project=
-  {project | morphs= change (.morphs project) }
-
-inSelect: Selectable ->Project ->Project
+inSelect: Selected ->Project ->Project
 inSelect selected project=
   {project | selected= selected }
 
-addMorph:
-    Id ->Translate
+addDefinition:
+  BranchingOffIndex
+  ->BranchingOffIndex
+  ->Dict BranchingOffIndex v
+  ->{a
+    | fontSize: Float
+    , defaultTranslate: Translate
+    }
   ->Model ->( Model, Cmd Msg )
-addMorph
-  id translate
-  ({scale, sizes} as model)
+addDefinition
+  definitionIndex
+  ingoingIndex branchingOffs
+  { fontSize, defaultTranslate }
+  ({ scale, sizes, projects } as model)
   =
   let name= "🥗 ← 🍅 🥬"
+      index=
+        nextFreeIndex
+          (.branchingOffs (ZipList.current projects))
   in
   ( {model
     | waitingForComputedTextWidth=
-        id::(.waitingForComputedTextWidth model)
+        .waitingForComputedTextWidth model
+        |>Maybe.map
+            (ZipList.insertAfter index)
+        |>Maybe.withDefault
+            (ZipList.singleton index)
+        |>Just
     }
     |>forSelectedProject
-        (updateMorphs
-          (add id
-            { name= name
-            , translate= translate
-            , input=
-                { input= Ids.empty
-                , translate= (.defaultGroupTranslate sizes)
-                }
-            , paddedTextWidth=
-                scale
-                (Use.Svg.aproximateMonospacedWidth
-                  (.fontSize sizes) name
-                )
-                |>padded (.pad sizes)
+        (addAndSelectBranchingOffAt index
+          (Definition
+            { definitionIndex= definitionIndex
+            , incomingBranchGaps= Dict.empty
+            , outgoingBranchGaps= Dict.empty
+            , translate= defaultTranslate
+            , name= name
+            , textWidth=
+                Use.Svg.aproximateMonospacedWidth fontSize
+                  name
+            , id= "noconect"|>String.toList
+              --this id will be replaced in the next update
             }
           )
-        >>inSelect (MorphSelected id)
         )
-
-  , computeMorphTextWidth name
+    
+  , computeBranchOffTextWidth name
   )
 
-updateMorph:
-  Id ->(Morph ->Morph) ->Project ->Project
-updateMorph id change=
-  updateMorphs (Ids.update id change)
+updateBranchingOffs:
+  (Dict BranchingOffIndex BranchingOff
+  ->Dict BranchingOffIndex BranchingOff
+  )
+  ->Project ->Project
+updateBranchingOffs change project=
+  {project
+  | branchingOffs= change (.branchingOffs project)
+  }
+
+updateBranchingOff:
+  BranchingOffIndex
+  ->(Maybe BranchingOff ->Maybe BranchingOff)
+  ->Project ->Project
+updateBranchingOff index=
+  updateBranchingOffs <<Dict.update index
+
+
+addAndSelectBranchOff:
+  BranchingOff ->Project ->Project
+addAndSelectBranchOff branchingOff project=
+  addAndSelectBranchingOffAt
+    (nextFreeIndex (.branchingOffs project))
+    branchingOff project
+
+addAndSelectBranchingOffAt:
+  BranchingOffIndex ->BranchingOff
+  ->Project ->Project
+addAndSelectBranchingOffAt index branchingOff=
+  updateBranchingOffs
+    (Dict.insert index branchingOff)
+  >>inSelect
+      (BranchingOffSelected index)
   
 
 subscriptions: Model ->Sub Msg
@@ -675,13 +947,13 @@ subscriptions _=
 port recieveComputedTextWidth:
   (Float ->msg) ->Sub msg
 port computeTextWidth:
-  { text: String, font: String }
+    { text: String, font: String }
   ->Cmd msg
 
-computeMorphTextWidth: String ->Cmd msg
-computeMorphTextWidth text=
+computeBranchOffTextWidth: String ->Cmd msg
+computeBranchOffTextWidth text=
   computeTextWidth
-    { font= "1px "++morphFont, text= text }
+    { font= "1px "++defaultFont, text= text }
 
 
 view: Model ->Browser.Document Msg
@@ -689,7 +961,7 @@ view model=
   { title= "lesy"
   , body=
       [ Html.div
-          [ HtmlAttr.style "height" "200%" ]
+          [ HtmlAttr.style "height" (oneAs100Percent 2) ]
           [ Ui.layoutWith
               { options=
                   [ Ui.focusStyle noChangeOnFocus
@@ -788,7 +1060,7 @@ attentionColor=
 catchPhrase: String
 catchPhrase=
   """
-    view friendly code.
+    make friendly code.
 simple & fun
   """
 
@@ -800,20 +1072,22 @@ viewEditorScreen
   }
   =
   let selectedProject= ZipList.current projects
-      searchMorph id=
-        search id (.morphs selectedProject)
+      branchingOffs= .branchingOffs selectedProject
+      searchBranchOff index=
+        Dict.get index (.branchingOffs selectedProject)
   in
   Ui.column
     [ Ui.width Ui.fill
     , Ui.height Ui.fill
     ]
     [ viewEditor
-        (.trunkMorph selectedProject)
-        searchMorph
+        (.branchingOffs selectedProject)
         (.selected selectedProject)
         ticks
         (case drag of
-          Drag-> Use.Svg.hand
+          Drag->
+            Use.Svg.hand
+
           NoDrag->
             case belowMouse of
               NotPressed-> Use.Svg.arrow
@@ -824,38 +1098,66 @@ viewEditorScreen
     , Ui.column
         [ Ui.width Ui.fill
         , Ui.height Ui.fill
-        , Ui.spacing 6
+        , Ui.spacing 9
         , UiBackground.color (Ui.rgb 0 0 0)
         ]
         [ case .selected selectedProject of
-            EditorSelected maybeId->
+            EditorSelected maybeIndex->
               viewEditorProperties
-                (.morphs selectedProject) maybeId
+                branchingOffs maybeIndex
 
-            MorphSelected id->
-              (searchMorph id)
+            BranchingOffSelected index->
+              Dict.get index branchingOffs
               |>Maybe.map
-                  (.name >>viewMorphProperties)
-              |>Maybe.withDefault Ui.none
+                  (\branchingOff->
+                    expectDefinition
+                      (val .definitionIndex branchingOff) branchingOffs
+                    |>Maybe.map
+                        (.name >>viewBranchOffProperties)
+                    |>Maybe.withDefault
+                        definitionNotFoundUi
+                  )
+              |>Maybe.withDefault
+                  branchingOffNotFoundUi
+                
               
             NothingSelected-> Ui.none
 
         , viewOptions projects
         ]
     ]
+val: (BranchOff {} ->b) ->BranchingOff ->b
+val valueOf=
+  valueOf <<toCommonBaseBranchOff
+toCommonBaseBranchOff: BranchingOff ->BranchOff {}
+toCommonBaseBranchOff branchingOff=
+  case branchingOff of
+    Defined defined-> defined
+
+    Definition 
+      { translate, definitionIndex
+      , incomingBranchGaps, outgoingBranchGaps
+      }
+      ->
+      { translate= translate
+      , definitionIndex= definitionIndex
+      , incomingBranchGaps= incomingBranchGaps
+      , outgoingBranchGaps= outgoingBranchGaps
+      }
+  
 
 editorColor: Ui.Color
 editorColor=
   Ui.rgb 0.039 0.035 0.031
 
 viewEditor:
-    Maybe Id ->(Id ->Maybe Morph)
-  ->Selectable ->Int ->Use.Svg.Cursor
+  Dict BranchingOffIndex BranchingOff
+  ->Selected ->Int ->Use.Svg.Cursor
   ->Sizes
   ->Ui.Element Msg
 viewEditor
-  trunkId searchMorph
-  selectable ticks cursor
+  branchingOffs
+  selected ticks cursor
   sizes
   =
   Ui.el
@@ -874,222 +1176,173 @@ viewEditor
         , Mouse.onDown (\_->PressEditor)
         , Use.Svg.mouseMoves Move
         ]
-        [ viewTree
-            trunkId searchMorph
-            selectable ticks sizes
+        [ viewBranchOff (BranchingFurther trunkIndex)
+            branchingOffs
+            selected ticks sizes
         ]
       )
     )
 
-viewTree:
-    Maybe Id ->(Id ->Maybe Morph)
-  ->Selectable ->Int ->Sizes
-  ->Svg Msg
-viewTree
-  trunk searchMorph
-  selected ticks sizes
-  =
-  trunk
-  |>Maybe.map
-      (\id->
-        viewMorph
-          id searchMorph
-          selected ticks sizes
-      )
-  |>Maybe.withDefault
-      (viewNoMorph PlaceTrunk sizes)
+branchingOffNotFoundSvg:
+  Use.Svg.Size ->Svg msg
+branchingOffNotFoundSvg fontSize=
+  viewLabel
+    fontSize "branching-off not found..."
 
-expect:
-    Maybe v ->Use.Svg.Size ->(v ->Svg msg)
-  ->Svg msg
-expect maybeExists fontSize toSvg=
-  maybeExists
-  |>Maybe.map toSvg
-  |>Maybe.withDefault
-      (viewLabel
-        fontSize
-        "morph not found..."
-      )
-
+branchingOffNotFoundUi: Ui.Element msg
+branchingOffNotFoundUi=
+  Ui.el
+    [ UiFont.family [ UiFont.typeface defaultFont ]
+    ]
+    (Ui.text "branching-off not found...")
 
 padded: number ->number ->number
 padded by length=
   by+ length +by
 
-viewMorph:
-    Id ->(Id ->Maybe Morph)
-  ->Selectable ->Int
-  ->SizesInMorphSelected
-    (SizesInMorph
+
+justDefinition: BranchingOff ->Maybe Definition
+justDefinition branchingOff=
+  case branchingOff of
+    Definition def->
+      Just def
+
+    _-> Nothing
+
+expectDefinition:
+  BranchingOffIndex
+  ->Dict BranchingOffIndex BranchingOff
+  ->Maybe Definition
+expectDefinition defIndex branchingOffs=
+  Dict.get defIndex branchingOffs
+  |>Maybe.andThen justDefinition
+
+definitionNotFoundSvg: Use.Svg.Size ->Svg msg
+definitionNotFoundSvg fontSize=
+  viewLabel fontSize "where is my definition?"
+
+definitionNotFoundUi: Ui.Element msg
+definitionNotFoundUi=
+  Ui.el
+    [ UiFont.family [ UiFont.typeface defaultFont ]
+    ]
+    (Ui.text "where is my definition?")
+
+
+viewBranchOff:
+  BranchGap
+  ->Dict BranchingOffIndex BranchingOff
+  ->Selected ->Int
+  ->SizesInBranchOffSelected
+    (SizesInBranchOff
       {a
       | textHeight: Float
       , lineWidth: Float
       , triangleCircumradius: Float
-      , defaultMorphTranslate: Translate
+      , defaultTranslate: Translate
       }
     )
   ->Svg Msg
-viewMorph
-  morphId searchMorph
+viewBranchOff
+  gap branchingOffs
   selected ticks
   ({ fontSize
-    , halfBoxHeight
-    , triangleWidth
+    , halfBoxHeight, triangleWidth
+    , defaultTranslate
     }
     as sizes
   )
   =
-  expect (searchMorph morphId)
-    (Use.Svg.px fontSize)
-    (\{ name, translate, paddedTextWidth
-      , input
-      }->
-      let afterTextX=
-           (+) triangleWidth paddedTextWidth
-          fullWidth= (+) afterTextX triangleWidth
-      in
-      Use.Svg.group
-        [ Use.Svg.translate translate ]
-        ((case selected of
-            MorphSelected id->
-              if (==) morphId id
-              then
-                [ viewMorphSelectedShadow
-                    paddedTextWidth sizes ticks
+  let begin= branchOffInputLineStart sizes
+      selectIfSelected index textWidth=
+        case selected of
+          BranchingOffSelected selectedIndex->
+            case (==) index selectedIndex of
+              True->
+                [ viewBranchOffSelectedShadow
+                    textWidth sizes ticks
                 ]
-              else []
-            _ ->[]
-          )
-          ++
-          [ Use.Svg.group
-              [ Use.Svg.translate { x= afterTextX, y= 0 }
-              ]
-              (let begin= morphInputLineStart sizes
-                   end= .translate input
-              in
-              [ viewConnection groupColor
-                  begin end sizes
-              , viewGroup
-                  morphId searchMorph
-                  selected ticks
-                  (rotation (combine (-) end begin)) sizes
-                  input
-              ]
-              )
-          , viewMorphShape
-              morphId name
-              (morphColor|>(toRgba Use.Svg.rgba))
-              paddedTextWidth sizes
+              False-> []
+
+          _-> []
+      viewShape index branchingOff name textWidth=
+        case branchingOff of
+          Defined defined->
+            [ viewBranchOffShape
+                index name
+                (branchOffColor|>toRgba Use.Svg.rgba)
+                textWidth sizes
+            ]
+          Definition definition->
+            [ viewConnection definitionColor
+                begin (.translate definition) sizes
+            , viewBranchOffShape
+                index name
+                (definitionColor|>toRgba Use.Svg.rgba)
+                textWidth sizes
+            ]
+      viewMissingBranchingOff index defId=
+        Use.Svg.group
+          [ Use.Svg.translate defaultTranslate ]
+          [ viewConnection missingBranchOffColor
+              begin defaultTranslate sizes
+          , viewMissingBranchOff index defId sizes
           ]
-        )
-    )
-
-viewGroup:
-    Id ->(Id ->Maybe Morph)
-  ->Selectable ->Int ->Float
-  ->SizesInGroup
-    (SizesInNoMorph
-    (SizesInConnection
-      {a
-      | fontSize: Float
-      , defaultMorphTranslate: Translate
-      }
-    ))
-  ->Group ->Svg Msg
-viewGroup
-  outputId searchMorph
-  selected ticks turn
-  ({ lineWidth, fontSize
-    , defaultMorphTranslate
-    }
-    as sizes
-  )
-  { input, translate }
-  =
-  Use.Svg.group
-    [ Use.Svg.translate translate ]
-    ((viewGroupShape outputId turn sizes)
-    ::
-    (input
-    |>Ids.values
-    |>List.map
-        (\morph->
-          let begin= morphInputLineStart sizes
-          in
-          morph
-          |>Maybe.map
-              (\id->
-                [ expect (id|>searchMorph)
-                    (Use.Svg.px fontSize)
-                    (\inputMorph->
-                      let end= 
-                            .translate inputMorph
-                            |>mapX ((+) (moveInsideTriangle lineWidth))
-                      in
-                      viewConnection morphColor
-                        begin end sizes
+      goDownTree=
+        .incomingBranchGaps
+        >>Dict.values
+        >>List.map
+            (\incomingMaybeIndex->
+              viewBranchOff
+                incomingMaybeIndex branchingOffs
+                selected ticks sizes
+            )
+  in
+  case gap of
+    BranchingFurther index->
+      Dict.get index branchingOffs
+      |>Maybe.map
+          (\branchingOff->
+            expectDefinition
+              (val .definitionIndex branchingOff)
+              branchingOffs
+            |>Maybe.map
+                (\{ name, textWidth, id }->
+                    Use.Svg.group
+                      [ Use.Svg.translate (val .translate branchingOff) ]
+                      ((selectIfSelected index textWidth)
+                      ++
+                      [ Use.Svg.group
+                          [ Use.Svg.translate
+                              { x= (+) triangleWidth textWidth, y= 0 }
+                          ]
+                          ((goDownTree (toCommonBaseBranchOff branchingOff))
+                          ++
+                          (viewShape index branchingOff name textWidth)
+                          )
+                      ]
                     )
-                , viewMorph
-                    id searchMorph
-                    selected ticks sizes
-                ]
-              )
-          |>Maybe.withDefault
-              [ viewConnection noMorphColor
-                  begin defaultMorphTranslate
-                  sizes 
-              , Use.Svg.group
-                  [ Use.Svg.translate defaultMorphTranslate
-                  ]
-                  [ viewNoMorph
-                      (AddInput outputId) sizes
-                  ]
-              ]
-        )
-    |>List.concat
-    )
-  )
-
-type alias SizesInGroup a=
-  {a
-  | triangleCircumradius: Float
-  , halfBoxHeight: Float
-  }
-viewGroupShape:
-    Id-> Float ->SizesInGroup a
-  -> Svg Msg
-viewGroupShape
-  output turn
-  { triangleCircumradius, halfBoxHeight }
-  =
-  Use.Svg.group
-    [ drags (GroupPressed output) ]
-    [ Use.Svg.circle 
-        halfBoxHeight
-        [ Use.Svg.fillColor
-            (groupColor|>toRgba Use.Svg.rgba)
-        ]
-    , Use.Svg.polygon
-        (regularPoly 5
-          triangleCircumradius
-          ((+) turn ((*) ((/) 1 5) pi))
-        )
-        [ Use.Svg.fillColor
-            (connectionColorFromMorph groupColor)
-        ]
-    ]
+                  )
+            |>Maybe.withDefault
+                (definitionNotFoundSvg (Use.Svg.px fontSize))
+          )
+      |>Maybe.withDefault
+          (branchingOffNotFoundSvg (Use.Svg.px fontSize))
+      
+    BranchMissing index id->
+      viewMissingBranchingOff index id
 
 
-type alias SizesInMorphSelected a=
+type alias SizesInBranchOffSelected a=
   {a
   | triangleWidth: Float
   , halfBoxHeight: Float
   }
-viewMorphSelectedShadow:
-    Float ->SizesInMorphSelected a
+viewBranchOffSelectedShadow:
+  Float ->SizesInBranchOffSelected a
   ->Int ->Svg msg
-viewMorphSelectedShadow
-  paddedTextWidth
+viewBranchOffSelectedShadow
+  textWidth
   { triangleWidth, halfBoxHeight }
   ticks
   =
@@ -1100,7 +1353,7 @@ viewMorphSelectedShadow
           }
           ticks
       afterTextX=
-        (+) paddedTextWidth triangleWidth
+        (+) textWidth triangleWidth
       bottom= (+) halfBoxHeight puls
   in
   Use.Svg.polygon
@@ -1125,39 +1378,39 @@ viewMorphSelectedShadow
         (attentionColor|>toRgba Use.Svg.rgba)
     ]
 
-drags: Pressable ->Svg.Attribute Msg
+drags: Pressed ->Svg.Attribute Msg
 drags=
   Svg.Events.onMouseDown <<Press
 
-clickable:
-  Pressable ->List (Svg.Attribute Msg)
-clickable part=
+clicks:
+  Pressed ->List (Svg.Attribute Msg)
+clicks part=
   [ drags part
   , Svg.Events.onMouseOver (MouseOn part)
   , Svg.Events.onMouseOut (MouseOn NotPressed)
   ]
 
-type alias SizesInMorph a=
+type alias SizesInBranchOff a=
   {a
   | fontSize: Float
   , triangleWidth: Float
   , halfBoxHeight: Float
   , pad: Float
   }
-viewMorphShape:
-    Id
+viewBranchOffShape:
+  BranchingOffIndex
   ->String ->Use.Svg.Color
-  ->Float ->SizesInMorph a
+  ->Float ->SizesInBranchOff a
   ->Svg Msg
-viewMorphShape
-  morphId name color
+viewBranchOffShape
+  index name color
   textWidth
   { fontSize
   , triangleWidth, halfBoxHeight, pad
   }
   =
   Use.Svg.group
-    (clickable (MorphPressed morphId))
+    (clicks (BranchingOffPressed index))
     [ Use.Svg.polygon
         (boxPoints
           triangleWidth textWidth halfBoxHeight
@@ -1191,23 +1444,23 @@ boxPoints triangleWidth textWidth halfHeight=
   ]
 
 
-morphColor: Rgba
-morphColor=
+branchOffColor: Rgba
+branchOffColor=
   { red= 0.0, green= 0.3, blue= 0.134 }
   |>withAlpha 0.6
 
-groupColor: Rgba
-groupColor=
-  { red= 0.425, green= 0.2, blue= 0.3 }
+definitionColor: Rgba
+definitionColor=
+  { red= 0.5, green= 0.1, blue= 0.5 }
   |>withAlpha 0.6
 
-noMorphColor: Rgba
-noMorphColor=
+missingBranchOffColor: Rgba
+missingBranchOffColor=
   { red= 0.8, green= 0.28, blue= 0.16 }
   |>withAlpha 0.34
 
-connectionColorFromMorph: Rgba ->Use.Svg.Color
-connectionColorFromMorph=
+connectionColorFromBranchOff: Rgba ->Use.Svg.Color
+connectionColorFromBranchOff=
   .rgb
   >>mapRed ((+) 0.35)
   >>mapGreen ((+) 0.21)
@@ -1218,18 +1471,18 @@ moveInsideTriangle: Float ->Float
 moveInsideTriangle lineWidth=
   (/) lineWidth (sqrt 2)
 
-morphInputLineStart:
-    {a
-    | triangleWidth: Float
-    , lineWidth: Float
-    }
+branchOffInputLineStart:
+  {a
+  | triangleWidth: Float
+  , lineWidth: Float
+  }
   ->Translate
-morphInputLineStart { triangleWidth, lineWidth }=
-  x0y0|>mapX
-      (\_->
-        (-) triangleWidth
-          (moveInsideTriangle lineWidth)
-      )
+branchOffInputLineStart { triangleWidth, lineWidth }=
+  { x=
+      (-) triangleWidth
+        (moveInsideTriangle lineWidth)
+  , y= 0
+  }
 
 type alias SizesInConnection a=
   {a
@@ -1250,7 +1503,7 @@ viewConnection
   Use.Svg.group
     [ Use.Svg.translate begin ]
     (let delta= combine (-) end begin
-         color= connectionColorFromMorph baseColor
+         color= connectionColorFromBranchOff baseColor
     in
     [ Use.Svg.polygon
       (regularPoly 3
@@ -1273,28 +1526,31 @@ viewConnection
     )
   
 
-type alias SizesInNoMorph a=
+type alias SizesInMissingBranchOff a=
   {a
   | textHeight: Float
   , lineWidth: Float
   , pad: Float
   }
-viewNoMorph:
-  (Id ->Msg) ->SizesInNoMorph a
+viewMissingBranchOff:
+  BranchingOffIndex ->DefinitionId
+  ->SizesInMissingBranchOff a
   ->Svg Msg
-viewNoMorph
-  generatedMsg
+viewMissingBranchOff
+  index definitionId
   { textHeight, pad, lineWidth }
   =
   let plusArmLength= (/) textHeight 2
       radius= (+) pad plusArmLength
   in
   Use.Svg.group
-    (clickable (NoMorphPressed generatedMsg))
-    [ Use.Svg.circle radius
+    (clicks
+    <|MissingBranchingOffPressed index definitionId
+    )
+    [ Use.Svg.circle (Use.Svg.px radius)
         [ Use.Svg.translate { x= radius, y= 0 }
         , Use.Svg.fillColor
-            (noMorphColor |>toRgba Use.Svg.rgba)
+            (missingBranchOffColor |>toRgba Use.Svg.rgba)
         ]
     , Use.Svg.line
         (plusPoints plusArmLength)
@@ -1304,7 +1560,7 @@ viewNoMorph
         , Use.Svg.linecap Use.Svg.roundCap
         , Use.Svg.linejoin Use.Svg.roundJoin
         , Use.Svg.lineColor
-            (connectionColorFromMorph noMorphColor)
+            (connectionColorFromBranchOff missingBranchOffColor)
         , Use.Svg.fillColor Use.Svg.transparent
         ]
     ]
@@ -1318,23 +1574,18 @@ plusPoints midDist=
   , { x= midDist, y= 0 }
   ]
 
-morphFont: String
-morphFont=
+defaultFont: String
+defaultFont=
   "Noto Sans"
 
 viewLabel: Use.Svg.Size ->String ->Svg msg
 viewLabel fontSize name=
   Use.Svg.text name
     [ Use.Svg.fillColor (Use.Svg.rgb 1 1 1)
-    , Use.Svg.fontFamily morphFont
+    , Use.Svg.fontFamily defaultFont
     , Use.Svg.fontSize fontSize
     , noTextSelect
     ]
-
-noTextSelect: Html.Attribute msg
-noTextSelect=
-  HtmlAttr.style
-    "-webkit-user-select" "none"
 
 
 viewTabRow:
@@ -1347,66 +1598,102 @@ viewTabRow=
       , Ui.width Ui.fill
       ]
 
-viewMorphTabs:
-  IdDict Morph ->Maybe Id ->Ui.Element Msg
-viewMorphTabs morphs selected=
-  viewTabRow
-    (let tab=
-          selected
-          |>Maybe.map
-              (\selectedId->
-                (\id->
-                  (case (==) id selectedId of
-                    True->
-                      viewSelectedTab
-                    False->
-                      viewUnselectedTab
-                  )
-                  <|SelectMorph id
+viewBranchOffTabs:
+  Dict BranchingOffIndex BranchingOff
+  ->Maybe BranchingOffIndex
+  ->Ui.Element Msg
+viewBranchOffTabs branchingOffs maybeSelectedIndex=
+  let tab=
+        maybeSelectedIndex
+        |>Maybe.map
+            (\selectedIndex->
+              (\index->
+                (case (==) index selectedIndex of
+                  True->
+                    viewSelectedTab
+
+                  False->
+                    viewUnselectedTab
                 )
+                <|SelectBranchingOff index
+              )
+            )
+        |>Maybe.withDefault
+            (viewUnselectedTab <<SelectBranchingOff)
+  in
+  viewTabRow
+    (branchingOffs
+    |>Dict.toList
+    |>List.map
+        (\( index, branchingOff )->
+          expectDefinition
+            (val .definitionIndex branchingOff)
+            branchingOffs
+          |>Maybe.map
+              (\definition->
+                case branchingOff of
+                  Definition def->
+                    tab index definition.name
+                      (branchOffColor|>toRgba Ui.rgba)
+                    
+                  Defined defined->
+                    tab index definition.name
+                      (branchOffColor|>toRgba Ui.rgba)
               )
           |>Maybe.withDefault
-              (viewUnselectedTab <<SelectMorph)
-    in
-    morphs
-    |>mapEach
-        (\id morph->
-          tab id (.name morph)
-            (morphColor|>toRgba Ui.rgba)
+              definitionNotFoundUi
         )
-    |>values
     )
 
 viewTab:
-    Int ->Ui.Color ->msg ->String ->Ui.Color
+  Ui.Color ->msg ->String ->Ui.Color
   ->Ui.Element msg
-viewTab padY fontColor onPress name bgColor=
-  UiInput.button 
-    [ UiBackground.color bgColor
-    , UiFont.color fontColor
-    , Ui.paddingXY 3 padY
-    , Ui.height Ui.fill
+viewTab fontColor onPress name bgColor=
+  Ui.row []
+    [ UiInput.button 
+        [ UiBackground.color (Ui.rgba 0 0 0 0)
+        , UiFont.color fontColor
+        , Ui.paddingXY 3 5
+        , Ui.height Ui.fill
+        ]
+        { onPress= Just onPress,
+          label=
+            Ui.el
+              [ Ui.centerY, Ui.centerX ]
+              (Ui.text name)
+        }
+    , Ui.el
+        [ Ui.width Ui.fill
+        , Ui.height (Ui.fill)
+        , Ui.paddingXY 6 0
+        ]
+        (Ui.html
+          (Svg.svg
+            [ Use.Svg.height (Use.Svg.px 2)
+            , Use.Svg.width (Use.Svg.relative 1)
+            ]
+            [ Use.Svg.circle (Use.Svg.relative 1)
+                [ Use.Svg.fillColor
+                    (Use.Svg.rgba 1 0.36 0 0.38)
+                ]
+            ]
+          )
+        )
     ]
-    { onPress= Just onPress,
-      label=
-        Ui.el
-          [ Ui.centerY, Ui.centerX ]
-          (Ui.text name)
-    }
+
 viewUnselectedTab:
   msg ->String ->Ui.Color ->Ui.Element msg
 viewUnselectedTab=
-  viewTab 3 (Ui.rgb 0.55 0.55 0.55)
+  viewTab (Ui.rgb 0.55 0.55 0.55)
 
 viewSelectedTab:
   msg ->String ->Ui.Color ->Ui.Element msg
 viewSelectedTab=
-  viewTab 7 (Ui.rgb 1 1 1)
+  viewTab (Ui.rgb 1 1 1)
 
 viewInput:
-    List (Ui.Attribute msg)
-  ->Ui.Element msg
-  ->Ui.Element msg
+  List (Ui.Attribute msg)
+  ->Ui.Element msg ->Ui.Element msg
 viewInput attrs inputElement=
   Ui.column
     ([ Ui.spacing 3 ]
@@ -1432,7 +1719,7 @@ viewInput attrs inputElement=
             [ Svg.rect
                 [ Use.Svg.height (Use.Svg.relative 1)
                 , Use.Svg.width (Use.Svg.relative 1)
-                , Use.Svg.fillColor (Use.Svg.rgba 1 0.36 0 0.7)
+                , Use.Svg.fillColor (Use.Svg.rgba 1 0.36 0 0.38)
                 ] []
             ]
           )
@@ -1440,31 +1727,36 @@ viewInput attrs inputElement=
     ]
 
 
-viewMorphProperties: String ->Ui.Element Msg
-viewMorphProperties name=
+viewBranchOffProperties: String ->Ui.Element Msg
+viewBranchOffProperties name=
   Ui.row
     [ Ui.width Ui.fill
     ]
-    [ viewInput [ Ui.width Ui.fill ]
-        (UiInput.search
-          [ UiBackground.color (Ui.rgba 0 0 0 0)
-          , UiBorder.color (Ui.rgba 0 0 0 0)
-          , Ui.width Ui.fill
-          , Ui.height Ui.fill
-          , UiFont.family [ UiFont.typeface morphFont ]
-          --, selection color attentionColor
-          ]
-          { onChange= RenameMorph
-          , text= name
-          , placeholder= Nothing
-          , label= UiInput.labelHidden "name"
-          }
-        )
+    [ viewBranchOffRename name
     ]
+viewBranchOffRename: String ->Ui.Element Msg
+viewBranchOffRename name=
+  viewInput [ Ui.width Ui.fill ]
+    (UiInput.search
+      [ UiBackground.color (Ui.rgba 0 0 0 0)
+      , UiBorder.color (Ui.rgba 0 0 0 0)
+      , Ui.width Ui.fill
+      , Ui.height Ui.fill
+      , UiFont.family [ UiFont.typeface defaultFont ]
+      ]
+      { onChange= RenameBranchingOff
+      , text= name
+      , placeholder= Nothing
+      , label= UiInput.labelHidden "name"
+      }
+    )
+
 
 viewEditorProperties:
-  IdDict Morph ->Maybe Id ->Ui.Element Msg
-viewEditorProperties morphs selected=
+  Dict BranchingOffIndex BranchingOff
+  ->Maybe BranchingOffIndex
+  ->Ui.Element Msg
+viewEditorProperties branchOffs selected=
   Ui.row
     [ Ui.width Ui.fill
     , Ui.spacing 4
@@ -1475,7 +1767,7 @@ viewEditorProperties morphs selected=
         [ viewScaleButton "⌃" (Scale ((/) 11 10))
         , viewScaleButton "⌄" (Scale ((/) 10 11))
         ]
-    , viewMorphTabs morphs selected
+    , viewBranchOffTabs branchOffs selected
     ]
 
 viewScaleButton: String ->msg ->Ui.Element msg
@@ -1498,6 +1790,8 @@ viewOptions projects=
     ([ viewSaveButton
     , viewSelectButton
     , viewAddBlankProjectButton
+    , viewProjectRename
+        (.name (ZipList.current projects))
     , viewProjectTabs projects
     ]
     |>List.map (Ui.el [ Ui.alignBottom ])
@@ -1548,6 +1842,23 @@ viewAddBlankProjectButton=
             ]
             (Ui.text "+")
       , onPress= Just AddBlankProject
+      }
+    )
+
+viewProjectRename: String ->Ui.Element Msg
+viewProjectRename name=
+  viewInput [ Ui.width Ui.fill ]
+    (UiInput.search
+      [ UiBackground.color (Ui.rgba 0 0 0 0)
+      , UiBorder.color (Ui.rgba 0 0 0 0)
+      , Ui.width Ui.fill
+      , Ui.height Ui.fill
+      , UiFont.family [ UiFont.typeface defaultFont ]
+      ]
+      { onChange= RenameProject
+      , text= name
+      , placeholder= Nothing
+      , label= UiInput.labelHidden "name"
       }
     )
 

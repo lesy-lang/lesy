@@ -11,12 +11,9 @@ type alias Translate=
 x0y0: Translate
 x0y0= Translate 0 0
 
-x1y1: Translate
-x1y1= Translate 1 1
-
 
 combine:
-    (Float ->Float ->Float) ->Translate
+  (Float ->Float ->Float) ->Translate
   ->(Translate ->Translate)
 combine change by=
   map (change by.x) (change by.y)
@@ -26,8 +23,8 @@ mapXY change=
   map change change
 
 map:
-     (Float ->Float) ->(Float ->Float)
-   ->Translate ->Translate
+  (Float ->Float) ->(Float ->Float)
+  ->Translate ->Translate
 map changeX changeY off=
   { x= changeX (.x off)
   , y= changeY (.y off)
@@ -56,7 +53,7 @@ type alias Translated a=
   {a | translate: Translate }
 
 updateTranslate:
-    (Translate ->Translate)
+  (Translate ->Translate)
   ->Translated a ->Translated a
 updateTranslate change translated=
   {translated

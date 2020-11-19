@@ -1,7 +1,7 @@
 module Use.Svg exposing
   ( Size, relative, px
   , width, height
-  , translate
+  , translateSizes, translate
 
   , Color, transparent, rgb, rgba
   , fillColor, lineColor
@@ -28,7 +28,10 @@ import Svg.Attributes as SvgAttr
 import Svg.Events
 import Use.Translate exposing (Translate)
 
+import Use.Misc exposing (oneAs100Percent)
+
 import Json.Decode
+import Dict exposing (size)
 
 
 text: String ->List (Svg.Attribute msg) ->Svg msg
@@ -41,22 +44,15 @@ type Size=
 
 {-|size compared to its parent
 
-    relative 1.0 --Length "100%"
+    relative 1.5 --Length "150%"
 -}
 relative: Float ->Size
 relative=
-  f0To1AsPercent>> Size
-
-f0To1AsPercent: Float ->String
-f0To1AsPercent f0To1=
-  (String.fromFloat ((*) 100 f0To1))
-  ++"%"
+  oneAs100Percent >>Size
 
 px: Float ->Size
-px pixel=
-  String.fromFloat pixel
-  ++ "px"
-  |>Size
+px=
+  String.fromFloat >>Size
 
 
 height: Size ->Svg.Attribute msg
@@ -70,11 +66,20 @@ width (Size size)=
 
 translate: Translate ->Svg.Attribute msg
 translate off=
+  translateSizes
+    { x= px<|(.x off), y= px<|(.y off) }
+
+translateSizes:
+  { x: Size, y: Size } ->Svg.Attribute msg
+translateSizes {x, y}=
   SvgAttr.transform
     (String.concat
-        [ "translate",
-          "(", off|>commaSeparated, ")"
-        ]
+      [ "translate"
+      , "("
+      , [x, y]|>List.map (\(Size size)-> size)
+        |>String.join ","
+      , ")"
+      ]
     )
 
 points: List Translate ->Svg.Attribute msg
@@ -100,14 +105,13 @@ polygon pts attrs=
     []
 
 circle:
-    Float ->List (Svg.Attribute msg)
+    Size ->List (Svg.Attribute msg)
   ->Svg msg
-circle radius attrs=
+circle (Size radius) attrs=
   Svg.circle
-    ( ( SvgAttr.r
-          (String.fromFloat radius)
-      )
-      ::attrs
+    ((SvgAttr.r radius
+    )
+    ::attrs
     )
     []
 
@@ -117,8 +121,8 @@ fontSize (Size size)=
   SvgAttr.fontSize size
 
 fontFamily: String ->Svg.Attribute msg
-fontFamily font=
-  SvgAttr.fontFamily font
+fontFamily=
+  SvgAttr.fontFamily
 
 
 
@@ -144,7 +148,7 @@ rgb r g b=
 componentsRgb: Float ->Float ->Float ->List String
 componentsRgb red green blue=
   [ red, green, blue ]
-  |>List.map f0To1AsPercent
+  |>List.map oneAs100Percent
 
 
 feedRgba: List String ->Float ->Color
@@ -232,18 +236,17 @@ cursor (Cursor kind)=
   SvgAttr.cursor kind
 
 group:
-    List (Svg.Attribute msg) ->List (Svg msg)
+  List (Svg.Attribute msg) ->List (Svg msg)
   ->Svg msg
 group=
   Svg.g
 
 
-mouseMoves: (Translate ->msg) ->Svg.Attribute msg
+mouseMoves:
+  (Translate ->msg) ->Svg.Attribute msg
 mouseMoves msg=
   Svg.Events.on "mousemove"
-    (Json.Decode.map
-      msg decodeMouseMove
-    )
+    (Json.Decode.map msg decodeMouseMove)
 
 decodeMouseMove: Json.Decode.Decoder Translate
 decodeMouseMove=

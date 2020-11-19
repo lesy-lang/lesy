@@ -21,7 +21,8 @@ equilateralTriangleHeight: Float ->Float
 equilateralTriangleHeight side=
   (*) side ((/) (sqrt 3) 2)
 
-regularPoly: Int ->Float ->Float ->List Translate
+regularPoly:
+  Int ->Float ->Float ->List Translate
 regularPoly edges toMid turn=
   let anglePerEdge=
         (/) ((*) 2 pi) (toFloat edges)

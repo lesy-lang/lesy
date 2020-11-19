@@ -29,6 +29,9 @@
     },
     "test-dependencies": {
         "direct": {},
-        "indirect": {}
+        "indirect": {
+            "elm/regex": "1.0.0",
+            "robinheghan/murmur3": "1.0.0"
+        }
     }
 }
