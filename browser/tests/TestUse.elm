@@ -4,14 +4,14 @@ import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Test exposing (..)
 
+import Dict exposing (Dict)
 import Use.Json exposing
   ( encodeDict, decodeDict
   , encodeNullable
   )
-import Dict exposing (Dict)
 import Json.Encode
 import Json.Decode
-import Use.Misc exposing (smallestFreeIndex)
+import Use.Collection exposing (smallestFreeIndex)
 import Use.Misc exposing (oneAs100Percent)
 
 

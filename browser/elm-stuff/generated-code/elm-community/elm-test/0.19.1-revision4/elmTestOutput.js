@@ -6965,16 +6965,7 @@ var $elm$core$List$head = function (list) {
 		return $elm$core$Maybe$Nothing;
 	}
 };
-var $author$project$Use$Misc$smallestFreeIndex = function (list) {
-	var potentialClashing = $elm$core$Set$fromList(
-		A2(
-			$elm$core$List$filter,
-			function (index) {
-				return _Utils_cmp(
-					index,
-					$elm$core$List$length(list)) < 0;
-			},
-			list));
+var $author$project$Use$Collection$smallestFreeIndex = function (list) {
 	return A2(
 		$elm$core$Maybe$withDefault,
 		$elm$core$List$length(list),
@@ -7079,7 +7070,7 @@ var $author$project$TestUse$suite = A2(
 						return A2(
 							$elm_explorations$test$Expect$equal,
 							1,
-							$author$project$Use$Misc$smallestFreeIndex(with3));
+							$author$project$Use$Collection$smallestFreeIndex(with3));
 					}),
 					A2(
 					$elm_explorations$test$Test$test,
@@ -7088,7 +7079,7 @@ var $author$project$TestUse$suite = A2(
 						return A2(
 							$elm_explorations$test$Expect$equal,
 							0,
-							$author$project$Use$Misc$smallestFreeIndex(_List_Nil));
+							$author$project$Use$Collection$smallestFreeIndex(_List_Nil));
 					})
 				])),
 			A2(
@@ -7107,7 +7098,7 @@ var $author$project$TestUse$suite = A2(
 					})
 				]))
 		]));
-var $author$project$Test$Generated$Main1713093404$main = A2(
+var $author$project$Test$Generated$Main3413205475$main = A2(
 	$author$project$Test$Runner$Node$run,
 	{
 		globs: _List_Nil,
@@ -7116,7 +7107,7 @@ var $author$project$Test$Generated$Main1713093404$main = A2(
 		processes: 8,
 		report: $author$project$Test$Reporter$Reporter$ConsoleReport($author$project$Console$Text$UseColor),
 		runs: $elm$core$Maybe$Nothing,
-		seed: 86627826371509
+		seed: 388684503106533
 	},
 	$elm_explorations$test$Test$concat(
 		_List_fromArray(
@@ -7127,10 +7118,10 @@ var $author$project$Test$Generated$Main1713093404$main = A2(
 				_List_fromArray(
 					[$author$project$TestUse$suite]))
 			])));
-_Platform_export({'Test':{'Generated':{'Main1713093404':{'init':$author$project$Test$Generated$Main1713093404$main($elm$json$Json$Decode$int)(0)}}}});}(this));
+_Platform_export({'Test':{'Generated':{'Main3413205475':{'init':$author$project$Test$Generated$Main3413205475$main($elm$json$Json$Decode$int)(0)}}}});}(this));
 return this.Elm;
 })({});
-var pipeFilename = "/tmp/elm_test-14342.sock";
+var pipeFilename = "/tmp/elm_test-15611.sock";
 // Make sure necessary things are defined.
 if (typeof Elm === 'undefined') {
   throw 'test runner config error: Elm is not defined. Make sure you provide a file compiled by Elm!';
