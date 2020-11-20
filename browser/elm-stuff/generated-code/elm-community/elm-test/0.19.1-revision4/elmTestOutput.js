@@ -6953,25 +6953,18 @@ var $elm$core$Set$diff = F2(
 		return $elm$core$Set$Set_elm_builtin(
 			A2($elm$core$Dict$diff, dict1, dict2));
 	});
-var $elm$core$Set$foldr = F3(
-	function (func, initialState, _v0) {
-		var dict = _v0.a;
-		return A3(
-			$elm$core$Dict$foldr,
-			F3(
-				function (key, _v1, state) {
-					return A2(func, key, state);
-				}),
-			initialState,
-			dict);
-	});
 var $elm$core$Set$fromList = function (list) {
 	return A3($elm$core$List$foldl, $elm$core$Set$insert, $elm$core$Set$empty, list);
 };
-var $elm$core$Basics$min = F2(
-	function (x, y) {
-		return (_Utils_cmp(x, y) < 0) ? x : y;
-	});
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
 var $author$project$Use$Misc$smallestFreeIndex = function (list) {
 	var potentialClashing = $elm$core$Set$fromList(
 		A2(
@@ -6982,18 +6975,19 @@ var $author$project$Use$Misc$smallestFreeIndex = function (list) {
 					$elm$core$List$length(list)) < 0;
 			},
 			list));
-	return A3(
-		$elm$core$Set$foldr,
-		$elm$core$Basics$min,
+	return A2(
+		$elm$core$Maybe$withDefault,
 		$elm$core$List$length(list),
-		A2(
-			$elm$core$Set$diff,
-			potentialClashing,
-			$elm$core$Set$fromList(
+		$elm$core$List$head(
+			$elm$core$Set$toList(
 				A2(
-					$elm$core$List$range,
-					0,
-					$elm$core$List$length(list)))));
+					$elm$core$Set$diff,
+					$elm$core$Set$fromList(
+						A2(
+							$elm$core$List$range,
+							0,
+							$elm$core$List$length(list) - 1)),
+					$elm$core$Set$fromList(list)))));
 };
 var $elm_explorations$test$Test$Internal$blankDescriptionFailure = $elm_explorations$test$Test$Internal$failNow(
 	{
@@ -7113,7 +7107,7 @@ var $author$project$TestUse$suite = A2(
 					})
 				]))
 		]));
-var $author$project$Test$Generated$Main3576007603$main = A2(
+var $author$project$Test$Generated$Main1713093404$main = A2(
 	$author$project$Test$Runner$Node$run,
 	{
 		globs: _List_Nil,
@@ -7122,7 +7116,7 @@ var $author$project$Test$Generated$Main3576007603$main = A2(
 		processes: 8,
 		report: $author$project$Test$Reporter$Reporter$ConsoleReport($author$project$Console$Text$UseColor),
 		runs: $elm$core$Maybe$Nothing,
-		seed: 154689773227074
+		seed: 86627826371509
 	},
 	$elm_explorations$test$Test$concat(
 		_List_fromArray(
@@ -7133,10 +7127,10 @@ var $author$project$Test$Generated$Main3576007603$main = A2(
 				_List_fromArray(
 					[$author$project$TestUse$suite]))
 			])));
-_Platform_export({'Test':{'Generated':{'Main3576007603':{'init':$author$project$Test$Generated$Main3576007603$main($elm$json$Json$Decode$int)(0)}}}});}(this));
+_Platform_export({'Test':{'Generated':{'Main1713093404':{'init':$author$project$Test$Generated$Main1713093404$main($elm$json$Json$Decode$int)(0)}}}});}(this));
 return this.Elm;
 })({});
-var pipeFilename = "/tmp/elm_test-7560.sock";
+var pipeFilename = "/tmp/elm_test-14342.sock";
 // Make sure necessary things are defined.
 if (typeof Elm === 'undefined') {
   throw 'test runner config error: Elm is not defined. Make sure you provide a file compiled by Elm!';

@@ -6,6 +6,10 @@ import Element as Ui
 import Dict exposing (Dict)
 import Json.Decode exposing (index)
 import Set
+import Maybe exposing (withDefault)
+import Array
+import Json.Encode
+import Use.Json exposing (encodeDict)
 
 {-|convert 0..1 with 1 being 100% to percent string
 
@@ -24,13 +28,12 @@ noTextSelect=
 
 smallestFreeIndex: List Int ->Int
 smallestFreeIndex list=
-  let potentialClashing=
-        list
-        |>List.filter
-            (\index-> index < (List.length list))
+  list
+    |>Set.fromList
+    |>Set.diff
+        (List.range 0 ((-) (List.length list) 1)
         |>Set.fromList
-  in
-  List.range 0 (List.length list)
-  |>Set.fromList
-  |>Set.diff potentialClashing
-  |>Set.foldr min (List.length list)
+        )
+    |>Set.toList
+  |>List.head
+  |>Maybe.withDefault (List.length list)
