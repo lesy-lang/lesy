@@ -16,7 +16,10 @@
     function computeTextWidth(text, font){
       var canvas=
         computeTextWidth.canvas
-        || (computeTextWidth.canvas= document.createElement("canvas"));
+        ||(
+          computeTextWidth.canvas=
+            document.createElement("canvas")
+          );
       var context= canvas.getContext("2d");
       context.font= font;
       var metrics= context.measureText(text);
