@@ -6398,7 +6398,7 @@ var $author$project$Use$Json$decodeDict = F2(
 					$elm$core$Dict$toList,
 					$elm$json$Json$Decode$dict(decodeValue))));
 	});
-var $author$project$Example$decodeEncoded = F2(
+var $author$project$TestUse$decodeEncoded = F2(
 	function (encode, decode) {
 		return A2(
 			$elm$json$Json$Decode$decodeString,
@@ -6559,7 +6559,10 @@ var $elm$json$Json$Decode$nullable = function (decoder) {
 				A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, decoder)
 			]));
 };
-var $author$project$Example$orFailWithJsonError = F2(
+var $author$project$Use$Misc$oneAs100Percent = function (f1) {
+	return $elm$core$String$fromFloat(100 * f1) + '%';
+};
+var $author$project$TestUse$orFailWithJsonError = F2(
 	function (expectationIfOk, decoded) {
 		if (decoded.$ === 'Ok') {
 			var result = decoded.a;
@@ -6570,6 +6573,428 @@ var $author$project$Example$orFailWithJsonError = F2(
 				$elm$json$Json$Decode$errorToString(err));
 		}
 	});
+var $elm$core$Dict$getMin = function (dict) {
+	getMin:
+	while (true) {
+		if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+			var left = dict.d;
+			var $temp$dict = left;
+			dict = $temp$dict;
+			continue getMin;
+		} else {
+			return dict;
+		}
+	}
+};
+var $elm$core$Dict$moveRedLeft = function (dict) {
+	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
+		if ((dict.e.d.$ === 'RBNode_elm_builtin') && (dict.e.d.a.$ === 'Red')) {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _v1 = dict.d;
+			var lClr = _v1.a;
+			var lK = _v1.b;
+			var lV = _v1.c;
+			var lLeft = _v1.d;
+			var lRight = _v1.e;
+			var _v2 = dict.e;
+			var rClr = _v2.a;
+			var rK = _v2.b;
+			var rV = _v2.c;
+			var rLeft = _v2.d;
+			var _v3 = rLeft.a;
+			var rlK = rLeft.b;
+			var rlV = rLeft.c;
+			var rlL = rLeft.d;
+			var rlR = rLeft.e;
+			var rRight = _v2.e;
+			return A5(
+				$elm$core$Dict$RBNode_elm_builtin,
+				$elm$core$Dict$Red,
+				rlK,
+				rlV,
+				A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					rlL),
+				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, rK, rV, rlR, rRight));
+		} else {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _v4 = dict.d;
+			var lClr = _v4.a;
+			var lK = _v4.b;
+			var lV = _v4.c;
+			var lLeft = _v4.d;
+			var lRight = _v4.e;
+			var _v5 = dict.e;
+			var rClr = _v5.a;
+			var rK = _v5.b;
+			var rV = _v5.c;
+			var rLeft = _v5.d;
+			var rRight = _v5.e;
+			if (clr.$ === 'Black') {
+				return A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			} else {
+				return A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			}
+		}
+	} else {
+		return dict;
+	}
+};
+var $elm$core$Dict$moveRedRight = function (dict) {
+	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
+		if ((dict.d.d.$ === 'RBNode_elm_builtin') && (dict.d.d.a.$ === 'Red')) {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _v1 = dict.d;
+			var lClr = _v1.a;
+			var lK = _v1.b;
+			var lV = _v1.c;
+			var _v2 = _v1.d;
+			var _v3 = _v2.a;
+			var llK = _v2.b;
+			var llV = _v2.c;
+			var llLeft = _v2.d;
+			var llRight = _v2.e;
+			var lRight = _v1.e;
+			var _v4 = dict.e;
+			var rClr = _v4.a;
+			var rK = _v4.b;
+			var rV = _v4.c;
+			var rLeft = _v4.d;
+			var rRight = _v4.e;
+			return A5(
+				$elm$core$Dict$RBNode_elm_builtin,
+				$elm$core$Dict$Red,
+				lK,
+				lV,
+				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, llK, llV, llLeft, llRight),
+				A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					lRight,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight)));
+		} else {
+			var clr = dict.a;
+			var k = dict.b;
+			var v = dict.c;
+			var _v5 = dict.d;
+			var lClr = _v5.a;
+			var lK = _v5.b;
+			var lV = _v5.c;
+			var lLeft = _v5.d;
+			var lRight = _v5.e;
+			var _v6 = dict.e;
+			var rClr = _v6.a;
+			var rK = _v6.b;
+			var rV = _v6.c;
+			var rLeft = _v6.d;
+			var rRight = _v6.e;
+			if (clr.$ === 'Black') {
+				return A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			} else {
+				return A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					$elm$core$Dict$Black,
+					k,
+					v,
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+			}
+		}
+	} else {
+		return dict;
+	}
+};
+var $elm$core$Dict$removeHelpPrepEQGT = F7(
+	function (targetKey, dict, color, key, value, left, right) {
+		if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) {
+			var _v1 = left.a;
+			var lK = left.b;
+			var lV = left.c;
+			var lLeft = left.d;
+			var lRight = left.e;
+			return A5(
+				$elm$core$Dict$RBNode_elm_builtin,
+				color,
+				lK,
+				lV,
+				lLeft,
+				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, key, value, lRight, right));
+		} else {
+			_v2$2:
+			while (true) {
+				if ((right.$ === 'RBNode_elm_builtin') && (right.a.$ === 'Black')) {
+					if (right.d.$ === 'RBNode_elm_builtin') {
+						if (right.d.a.$ === 'Black') {
+							var _v3 = right.a;
+							var _v4 = right.d;
+							var _v5 = _v4.a;
+							return $elm$core$Dict$moveRedRight(dict);
+						} else {
+							break _v2$2;
+						}
+					} else {
+						var _v6 = right.a;
+						var _v7 = right.d;
+						return $elm$core$Dict$moveRedRight(dict);
+					}
+				} else {
+					break _v2$2;
+				}
+			}
+			return dict;
+		}
+	});
+var $elm$core$Dict$removeMin = function (dict) {
+	if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+		var color = dict.a;
+		var key = dict.b;
+		var value = dict.c;
+		var left = dict.d;
+		var lColor = left.a;
+		var lLeft = left.d;
+		var right = dict.e;
+		if (lColor.$ === 'Black') {
+			if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+				var _v3 = lLeft.a;
+				return A5(
+					$elm$core$Dict$RBNode_elm_builtin,
+					color,
+					key,
+					value,
+					$elm$core$Dict$removeMin(left),
+					right);
+			} else {
+				var _v4 = $elm$core$Dict$moveRedLeft(dict);
+				if (_v4.$ === 'RBNode_elm_builtin') {
+					var nColor = _v4.a;
+					var nKey = _v4.b;
+					var nValue = _v4.c;
+					var nLeft = _v4.d;
+					var nRight = _v4.e;
+					return A5(
+						$elm$core$Dict$balance,
+						nColor,
+						nKey,
+						nValue,
+						$elm$core$Dict$removeMin(nLeft),
+						nRight);
+				} else {
+					return $elm$core$Dict$RBEmpty_elm_builtin;
+				}
+			}
+		} else {
+			return A5(
+				$elm$core$Dict$RBNode_elm_builtin,
+				color,
+				key,
+				value,
+				$elm$core$Dict$removeMin(left),
+				right);
+		}
+	} else {
+		return $elm$core$Dict$RBEmpty_elm_builtin;
+	}
+};
+var $elm$core$Dict$removeHelp = F2(
+	function (targetKey, dict) {
+		if (dict.$ === 'RBEmpty_elm_builtin') {
+			return $elm$core$Dict$RBEmpty_elm_builtin;
+		} else {
+			var color = dict.a;
+			var key = dict.b;
+			var value = dict.c;
+			var left = dict.d;
+			var right = dict.e;
+			if (_Utils_cmp(targetKey, key) < 0) {
+				if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Black')) {
+					var _v4 = left.a;
+					var lLeft = left.d;
+					if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+						var _v6 = lLeft.a;
+						return A5(
+							$elm$core$Dict$RBNode_elm_builtin,
+							color,
+							key,
+							value,
+							A2($elm$core$Dict$removeHelp, targetKey, left),
+							right);
+					} else {
+						var _v7 = $elm$core$Dict$moveRedLeft(dict);
+						if (_v7.$ === 'RBNode_elm_builtin') {
+							var nColor = _v7.a;
+							var nKey = _v7.b;
+							var nValue = _v7.c;
+							var nLeft = _v7.d;
+							var nRight = _v7.e;
+							return A5(
+								$elm$core$Dict$balance,
+								nColor,
+								nKey,
+								nValue,
+								A2($elm$core$Dict$removeHelp, targetKey, nLeft),
+								nRight);
+						} else {
+							return $elm$core$Dict$RBEmpty_elm_builtin;
+						}
+					}
+				} else {
+					return A5(
+						$elm$core$Dict$RBNode_elm_builtin,
+						color,
+						key,
+						value,
+						A2($elm$core$Dict$removeHelp, targetKey, left),
+						right);
+				}
+			} else {
+				return A2(
+					$elm$core$Dict$removeHelpEQGT,
+					targetKey,
+					A7($elm$core$Dict$removeHelpPrepEQGT, targetKey, dict, color, key, value, left, right));
+			}
+		}
+	});
+var $elm$core$Dict$removeHelpEQGT = F2(
+	function (targetKey, dict) {
+		if (dict.$ === 'RBNode_elm_builtin') {
+			var color = dict.a;
+			var key = dict.b;
+			var value = dict.c;
+			var left = dict.d;
+			var right = dict.e;
+			if (_Utils_eq(targetKey, key)) {
+				var _v1 = $elm$core$Dict$getMin(right);
+				if (_v1.$ === 'RBNode_elm_builtin') {
+					var minKey = _v1.b;
+					var minValue = _v1.c;
+					return A5(
+						$elm$core$Dict$balance,
+						color,
+						minKey,
+						minValue,
+						left,
+						$elm$core$Dict$removeMin(right));
+				} else {
+					return $elm$core$Dict$RBEmpty_elm_builtin;
+				}
+			} else {
+				return A5(
+					$elm$core$Dict$balance,
+					color,
+					key,
+					value,
+					left,
+					A2($elm$core$Dict$removeHelp, targetKey, right));
+			}
+		} else {
+			return $elm$core$Dict$RBEmpty_elm_builtin;
+		}
+	});
+var $elm$core$Dict$remove = F2(
+	function (key, dict) {
+		var _v0 = A2($elm$core$Dict$removeHelp, key, dict);
+		if ((_v0.$ === 'RBNode_elm_builtin') && (_v0.a.$ === 'Red')) {
+			var _v1 = _v0.a;
+			var k = _v0.b;
+			var v = _v0.c;
+			var l = _v0.d;
+			var r = _v0.e;
+			return A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, k, v, l, r);
+		} else {
+			var x = _v0;
+			return x;
+		}
+	});
+var $elm$core$Dict$diff = F2(
+	function (t1, t2) {
+		return A3(
+			$elm$core$Dict$foldl,
+			F3(
+				function (k, v, t) {
+					return A2($elm$core$Dict$remove, k, t);
+				}),
+			t1,
+			t2);
+	});
+var $elm$core$Set$diff = F2(
+	function (_v0, _v1) {
+		var dict1 = _v0.a;
+		var dict2 = _v1.a;
+		return $elm$core$Set$Set_elm_builtin(
+			A2($elm$core$Dict$diff, dict1, dict2));
+	});
+var $elm$core$Set$foldr = F3(
+	function (func, initialState, _v0) {
+		var dict = _v0.a;
+		return A3(
+			$elm$core$Dict$foldr,
+			F3(
+				function (key, _v1, state) {
+					return A2(func, key, state);
+				}),
+			initialState,
+			dict);
+	});
+var $elm$core$Set$fromList = function (list) {
+	return A3($elm$core$List$foldl, $elm$core$Set$insert, $elm$core$Set$empty, list);
+};
+var $elm$core$Basics$min = F2(
+	function (x, y) {
+		return (_Utils_cmp(x, y) < 0) ? x : y;
+	});
+var $author$project$Use$Misc$smallestFreeIndex = function (list) {
+	var potentialClashing = $elm$core$Set$fromList(
+		A2(
+			$elm$core$List$filter,
+			function (index) {
+				return _Utils_cmp(
+					index,
+					$elm$core$List$length(list)) < 0;
+			},
+			list));
+	return A3(
+		$elm$core$Set$foldr,
+		$elm$core$Basics$min,
+		$elm$core$List$length(list),
+		A2(
+			$elm$core$Set$diff,
+			potentialClashing,
+			$elm$core$Set$fromList(
+				A2(
+					$elm$core$List$range,
+					0,
+					$elm$core$List$length(list)))));
+};
 var $elm_explorations$test$Test$Internal$blankDescriptionFailure = $elm_explorations$test$Test$Internal$failNow(
 	{
 		description: 'This test has a blank description. Let\'s give it a useful one!',
@@ -6589,70 +7014,129 @@ var $elm_explorations$test$Test$test = F2(
 						]);
 				}));
 	});
-var $author$project$Example$suite = A2(
+var $author$project$TestUse$suite = A2(
 	$elm_explorations$test$Test$describe,
-	'json',
+	'use',
 	_List_fromArray(
 		[
 			A2(
-			$elm_explorations$test$Test$test,
-			'decoded dict equal to encoded dict',
-			function (_v0) {
-				var dict = A3(
-					$elm$core$Dict$insert,
-					4,
-					'third',
-					A3(
-						$elm$core$Dict$insert,
-						2,
-						'second',
-						A3($elm$core$Dict$insert, 1, 'first', $elm$core$Dict$empty)));
-				return A2(
-					$author$project$Example$orFailWithJsonError,
-					$elm_explorations$test$Expect$equalDicts(dict),
+			$elm_explorations$test$Test$describe,
+			'json',
+			_List_fromArray(
+				[
 					A2(
-						$author$project$Example$decodeEncoded,
-						A4($author$project$Use$Json$encodeDict, 3, $elm$json$Json$Encode$int, $elm$json$Json$Encode$string, dict),
-						A2($author$project$Use$Json$decodeDict, $elm$json$Json$Decode$int, $elm$json$Json$Decode$string)));
-			}),
+					$elm_explorations$test$Test$test,
+					'decoded dict equal to encoded dict',
+					function (_v0) {
+						var dict = A3(
+							$elm$core$Dict$insert,
+							4,
+							'third',
+							A3(
+								$elm$core$Dict$insert,
+								2,
+								'second',
+								A3($elm$core$Dict$insert, 1, 'first', $elm$core$Dict$empty)));
+						return A2(
+							$author$project$TestUse$orFailWithJsonError,
+							$elm_explorations$test$Expect$equalDicts(dict),
+							A2(
+								$author$project$TestUse$decodeEncoded,
+								A4($author$project$Use$Json$encodeDict, 3, $elm$json$Json$Encode$int, $elm$json$Json$Encode$string, dict),
+								A2($author$project$Use$Json$decodeDict, $elm$json$Json$Decode$int, $elm$json$Json$Decode$string)));
+					}),
+					A2(
+					$elm_explorations$test$Test$test,
+					'decoded nullable equal to encoded nullable (← tested)',
+					function (_v1) {
+						var just = $elm$core$Maybe$Just(986);
+						return A2(
+							$author$project$TestUse$orFailWithJsonError,
+							$elm_explorations$test$Expect$equal(just),
+							A2(
+								$author$project$TestUse$decodeEncoded,
+								A2($author$project$Use$Json$encodeNullable, $elm$json$Json$Encode$int, just),
+								$elm$json$Json$Decode$nullable($elm$json$Json$Decode$int)));
+					}),
+					A2(
+					$elm_explorations$test$Test$test,
+					'decoded nullable equal to encoded nothing (← tested)',
+					function (_v2) {
+						return A2(
+							$author$project$TestUse$orFailWithJsonError,
+							$elm_explorations$test$Expect$equal($elm$core$Maybe$Nothing),
+							A2(
+								$author$project$TestUse$decodeEncoded,
+								A2($author$project$Use$Json$encodeNullable, $elm$json$Json$Encode$int, $elm$core$Maybe$Nothing),
+								$elm$json$Json$Decode$nullable($elm$json$Json$Decode$int)));
+					})
+				])),
 			A2(
-			$elm_explorations$test$Test$test,
-			'decoded nullable equal to encoded nullable (← tested)',
-			function (_v1) {
-				var just = $elm$core$Maybe$Just(986);
-				return A2(
-					$author$project$Example$orFailWithJsonError,
-					$elm_explorations$test$Expect$equal(just),
+			$elm_explorations$test$Test$describe,
+			'collection',
+			_List_fromArray(
+				[
 					A2(
-						$author$project$Example$decodeEncoded,
-						A2($author$project$Use$Json$encodeNullable, $elm$json$Json$Encode$int, just),
-						$elm$json$Json$Decode$nullable($elm$json$Json$Decode$int)));
-			})
+					$elm_explorations$test$Test$test,
+					'smallest free index in a list 3 0 2',
+					function (_v3) {
+						var with3 = _List_fromArray(
+							[3, 0, 2]);
+						return A2(
+							$elm_explorations$test$Expect$equal,
+							1,
+							$author$project$Use$Misc$smallestFreeIndex(with3));
+					}),
+					A2(
+					$elm_explorations$test$Test$test,
+					'smallest free index in an empty list',
+					function (_v4) {
+						return A2(
+							$elm_explorations$test$Expect$equal,
+							0,
+							$author$project$Use$Misc$smallestFreeIndex(_List_Nil));
+					})
+				])),
+			A2(
+			$elm_explorations$test$Test$describe,
+			'miscellaneous',
+			_List_fromArray(
+				[
+					A2(
+					$elm_explorations$test$Test$test,
+					'1 as 100%: negative decimals >1',
+					function (_v5) {
+						return A2(
+							$elm_explorations$test$Expect$equal,
+							$author$project$Use$Misc$oneAs100Percent(-3.7),
+							'-370%');
+					})
+				]))
 		]));
-var $author$project$Test$Generated$Main3868372205$main = A2(
+var $author$project$Test$Generated$Main3576007603$main = A2(
 	$author$project$Test$Runner$Node$run,
 	{
 		globs: _List_Nil,
 		paths: _List_fromArray(
-			['/home/pascal/Dokumente/home/lesy/uvi/browser/tests/Example.elm']),
+			['/home/pascal/Dokumente/home/lesy/uvi/browser/tests/TestUse.elm']),
 		processes: 8,
 		report: $author$project$Test$Reporter$Reporter$ConsoleReport($author$project$Console$Text$UseColor),
 		runs: $elm$core$Maybe$Nothing,
-		seed: 392908834660046
+		seed: 154689773227074
 	},
 	$elm_explorations$test$Test$concat(
 		_List_fromArray(
 			[
 				A2(
 				$elm_explorations$test$Test$describe,
-				'Example',
+				'TestUse',
 				_List_fromArray(
-					[$author$project$Example$suite]))
+					[$author$project$TestUse$suite]))
 			])));
-_Platform_export({'Test':{'Generated':{'Main3868372205':{'init':$author$project$Test$Generated$Main3868372205$main($elm$json$Json$Decode$int)(0)}}}});}(this));
+_Platform_export({'Test':{'Generated':{'Main3576007603':{'init':$author$project$Test$Generated$Main3576007603$main($elm$json$Json$Decode$int)(0)}}}});}(this));
 return this.Elm;
 })({});
-var pipeFilename = "/tmp/elm_test-6537.sock";
+var pipeFilename = "/tmp/elm_test-7560.sock";
 // Make sure necessary things are defined.
 if (typeof Elm === 'undefined') {
   throw 'test runner config error: Elm is not defined. Make sure you provide a file compiled by Elm!';

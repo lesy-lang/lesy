@@ -370,7 +370,7 @@ scaleSizes scale=
   let fontSize= 22|>scale
       textHeight= Use.Svg.computeHeight fontSize
       pad= (*) 0.4 fontSize
-      boxHeight= textHeight|>padded pad
+      boxHeight= textHeight |>padded pad
       triangleWidth=
         equilateralTriangleHeight ((/) boxHeight 2)
   in
@@ -396,7 +396,7 @@ trunkIndex= 0
 
 appDefinitionId: DefinitionId
 appDefinitionId=
-  "򦸔󼼐򙖞񠴔򍻕򿂽𢘞񬆺"|>String.toList--todo
+  "򦸔󼼐򙖞񠴔򍻕򿂽𢘞񬆺"|>String.toList
 
 {-| **TODO.**
 Will contain mostly native and core definitions, e.g.
@@ -415,7 +415,7 @@ basicDefinitions { defaultTranslate }=
   |>Dict.insert trunkIndex
       (Definition
         { translate= defaultTranslate
-        , definitionIndex= trunkIndex--todo, there must be a definition
+        , definitionIndex= trunkIndex--todo must be a real definition
         , incomingBranchGaps= Dict.empty--todo
         , outgoingBranchGaps= Dict.empty
         , id= appDefinitionId
@@ -825,11 +825,6 @@ update msg ({sizes} as model)=
           )
       |>Maybe.withDefault
           ( model, Cmd.none )
-
-nextFreeIndex:
-  Dict Int v ->Int
-nextFreeIndex=
-  Dict.keys >>List.foldr max 0
 
 inDrag: Drag ->Model ->Model
 inDrag drag model=
