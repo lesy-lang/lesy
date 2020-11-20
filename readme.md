@@ -13,7 +13,7 @@ some examples:
 → 💬  | 💬 ←
 ----- | --
 → Name clashes? |
-- | <div align="right">No? ←</div>
+. | <div align="right">No? ←</div>
 . | <div align="right">Each definition is unique all around the 🌏 ←</div>
 → But either way, snake_case or PascalCase? | 
 . | <div align="right">s p a c e s ←</div>
